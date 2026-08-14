@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%231B7F5E'/%3E%3Ctext x='12' y='17' text-anchor='middle' font-size='13' font-weight='700' fill='%23fff' font-family='system-ui'%3EV%3C/text%3E%3C/svg%3E">
+<meta name="theme-color" content="#1B7F5E">
+<title>Đăng ký · VocabMaster</title>
+<link rel="stylesheet" href="vm-theme.css">
+<style>
+.vm-modal-bg{position:fixed;inset:0;background:rgba(13,79,58,.45);z-index:500;display:none;align-items:center;justify-content:center;padding:20px}
+.vm-modal-bg.show{display:flex}
+</style>
+</head>
+<body>
+
+<div class="vm-loading-overlay" id="loadingOverlay">
+  <span class="vm-spin"></span>
+  <p id="loadingMsg">Đang xử lý…</p>
+</div>
+
+<div class="vm-auth-wrap">
+  <div class="vm-auth-card">
+    <div class="vm-auth-head">
+      <div id="brand" style="display:flex;justify-content:center"></div>
+      <h1 class="vm-auth-title">Đăng ký tài khoản</h1>
+      <p class="vm-auth-sub">Tạo tài khoản sinh viên và bắt đầu luyện từ vựng.</p>
+    </div>
+
+    <form id="form" autocomplete="on" novalidate>
+      <div class="vm-field">
+        <label class="vm-label">Họ và tên <span style="color:var(--vm-danger)">*</span></label>
+        <input class="vm-input" id="name" placeholder="Nguyễn Văn A" autocomplete="name">
+        <div class="vm-field-err" id="err-name"></div>
+      </div>
+      <div class="vm-row">
+        <div class="vm-field">
+          <label class="vm-label">Student ID <span style="color:var(--vm-danger)">*</span></label>
+          <input class="vm-input" id="studentId" placeholder="1234567" autocomplete="username">
+          <div class="vm-field-err" id="err-studentId"></div>
+        </div>
+        <div class="vm-field">
+          <label class="vm-label">Mã lớp <span style="color:var(--vm-danger)">*</span></label>
+          <input class="vm-input" id="class" placeholder="VM-XXXXX" style="text-transform:uppercase" autocomplete="off">
+          <div class="vm-field-err" id="err-class"></div>
+        </div>
+      </div>
+      <div class="vm-field">
+        <label class="vm-label">Email <span style="color:var(--vm-danger)">*</span></label>
+        <input class="vm-input" id="email" type="email" placeholder="ban@email.com" autocomplete="email">
+        <div class="vm-field-err" id="err-email"></div>
+      </div>
+      <div class="vm-row">
+        <div class="vm-field">
+          <label class="vm-label">Ngày sinh <span style="color:var(--vm-danger)">*</span></label>
+          <input class="vm-input" id="birthdate" type="date" autocomplete="bday">
+          <div class="vm-field-err" id="err-birthdate"></div>
+        </div>
+        <div class="vm-field">
+          <label class="vm-label">Số điện thoại <span style="color:var(--vm-danger)">*</span></label>
+          <input class="vm-input" id="phone" placeholder="09xx xxx xxx" type="tel" autocomplete="tel">
+          <div class="vm-field-err" id="err-phone"></div>
+        </div>
+      </div>
+      <div class="vm-field">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <label class="vm-label">Mật khẩu <span style="color:var(--vm-danger)">*</span></label>
+          <button type="button" class="vm-pass-toggle" id="pwToggle">show</button>
+        </div>
+        <div class="vm-pass-wrap">
+          <input class="vm-input" id="pw" type="password" placeholder="Tối thiểu 6 ký tự" autocomplete="new-password">
+        </div>
+        <div class="vm-field-err" id="err-pw"></div>
+      </div>
+      <p style="font-size:.76rem;color:var(--vm-ink-3);margin:0 0 10px">
+        <span style="color:var(--vm-danger)">*</span> Tất cả trường đều bắt buộc.
+      </p>
+      <button class="vm-btn vm-btn-primary vm-btn-block" id="submit" type="submit">Tạo tài khoản</button>
+    </form>
+
+    <div style="border-top:1px solid var(--vm-border-2);margin:20px 0 16px"></div>
+    <button class="vm-btn vm-btn-ghost vm-btn-block" id="teacherReg">🎓 Đăng ký Giáo viên</button>
+    <p class="vm-auth-alt" style="margin-top:16px">Đã có tài khoản? <a href="login.html">Đăng nhập</a></p>
+  </div>
+</div>
+
+<!-- Teacher signup modal -->
+<div class="vm-modal-bg" id="teacherModal">
+  <div class="vm-auth-card" style="max-width:400px;margin:0">
+    <div class="vm-auth-head">
+      <h1 class="vm-auth-title" style="font-size:1.4rem">Đăng ký Giáo viên</h1>
+    </div>
+    <div class="vm-field">
+      <label class="vm-label">Họ và tên <span style="color:var(--vm-danger)">*</span></label>
+      <input class="vm-input" id="tName" placeholder="ThS. Nguyễn Văn A">
+      <div class="vm-field-err" id="err-tName"></div>
+    </div>
+    <div class="vm-field">
+      <label class="vm-label">Email <span style="color:var(--vm-danger)">*</span></label>
+      <input class="vm-input" id="tEmail" type="email" placeholder="ban@dnpu.edu.vn">
+      <div class="vm-field-err" id="err-tEmail"></div>
+    </div>
+    <div class="vm-row">
+      <div class="vm-field">
+        <label class="vm-label">Ngày sinh <span style="color:var(--vm-danger)">*</span></label>
+        <input class="vm-input" id="tBirth" type="date">
+        <div class="vm-field-err" id="err-tBirth"></div>
+      </div>
+      <div class="vm-field">
+        <label class="vm-label">Số điện thoại <span style="color:var(--vm-danger)">*</span></label>
+        <input class="vm-input" id="tPhone" placeholder="09xx" type="tel">
+        <div class="vm-field-err" id="err-tPhone"></div>
+      </div>
+    </div>
+    <div class="vm-field">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <label class="vm-label">Mật khẩu <span style="color:var(--vm-danger)">*</span></label>
+        <button type="button" class="vm-pass-toggle" id="tPwToggle">show</button>
+      </div>
+      <div class="vm-pass-wrap">
+        <input class="vm-input" id="tPw" type="password" placeholder="Tối thiểu 6 ký tự">
+      </div>
+      <div class="vm-field-err" id="err-tPw"></div>
+    </div>
+    <button class="vm-btn vm-btn-primary vm-btn-block" id="tSubmit" style="margin-top:6px">Tạo tài khoản giáo viên</button>
+    <div style="text-align:right;margin-top:12px">
+      <a href="#" id="tClose" style="font-size:.82rem;color:var(--vm-ink-3);text-decoration:none">Huỷ</a>
+    </div>
+  </div>
+</div>
+
+<script src="vm-common.js"></script>
+<script>
+if (typeof VM === 'undefined') {
+  document.body.innerHTML = '<div style="max-width:500px;margin:80px auto;padding:30px;border:2px solid #EA4335;border-radius:14px;font-family:system-ui"><h2>Không tải được vm-common.js</h2></div>';
+  throw new Error('no VM');
+}
+document.getElementById('brand').innerHTML = VM.brandLockup();
+
+function showLoading(msg){ document.getElementById('loadingMsg').textContent=msg||'Đang xử lý…'; document.getElementById('loadingOverlay').classList.add('show'); }
+function hideLoading(){ document.getElementById('loadingOverlay').classList.remove('show'); }
+
+function setErr(id,msg){
+  var inp=document.getElementById(id), err=document.getElementById('err-'+id);
+  if(inp) inp.classList.toggle('field-error',!!msg);
+  if(err){err.textContent=msg||'';err.classList.toggle('show',!!msg);}
+}
+function clearErrs(ids){ ids.forEach(function(id){setErr(id,'');}); }
+
+document.getElementById('pwToggle').onclick=function(){
+  var inp=document.getElementById('pw'),h=inp.type==='password';
+  inp.type=h?'text':'password';this.textContent=h?'hide':'show';
+};
+document.getElementById('tPwToggle').onclick=function(){
+  var inp=document.getElementById('tPw'),h=inp.type==='password';
+  inp.type=h?'text':'password';this.textContent=h?'hide':'show';
+};
+
+var SF=['name','studentId','class','email','birthdate','phone','pw'];
+function validateStudent(){
+  clearErrs(SF); var ok=true;
+  function req(id,lbl){if(!(document.getElementById(id).value||'').trim()){setErr(id,lbl+' là bắt buộc.');ok=false;}}
+  req('name','Họ và tên');req('studentId','Student ID');req('class','Mã lớp');
+  req('email','Email');req('birthdate','Ngày sinh');req('phone','Số điện thoại');
+  var pw=document.getElementById('pw').value||'';
+  if(!pw.trim()){setErr('pw','Mật khẩu là bắt buộc.');ok=false;}
+  else if(pw.trim().length<6){setErr('pw','Mật khẩu phải có ít nhất 6 ký tự.');ok=false;}
+  var email=(document.getElementById('email').value||'').trim();
+  if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){setErr('email','Email không hợp lệ.');ok=false;}
+  return ok;
+}
+
+document.getElementById('form').onsubmit=function(e){
+  e.preventDefault(); if(!validateStudent()) return;
+  showLoading('Đang kiểm tra thông tin…');
+  function trim(id){return (document.getElementById(id).value||'').trim();}
+  VM.api('auth.studentSignup',{
+    studentId:trim('studentId'),name:trim('name'),
+    class:trim('class').toUpperCase(),birthdate:trim('birthdate'),
+    password:document.getElementById('pw').value,
+    phone:trim('phone'),email:trim('email')
+  }).then(function(res){
+    hideLoading();
+    if(res&&res.success){
+      VM.session.set(Object.assign({role:'student'},res.data),{remember:false});
+      VM.toast('Đăng ký thành công!','ok');
+      setTimeout(function(){location.href=VM.STUDENT_HOME;},600);
+    } else {
+      var msg=(res&&res.error)||'Đăng ký thất bại.';
+      var field=res&&res.field;
+      if(field) setErr(field,msg);
+      else if(msg.indexOf('Student ID')>-1) setErr('studentId',msg);
+      else if(msg.indexOf('Email')>-1) setErr('email',msg);
+      else if(msg.indexOf('điện thoại')>-1) setErr('phone',msg);
+      else if(msg.indexOf('lớp')>-1) setErr('class',msg);
+      else VM.toast(msg,'err',5000);
+    }
+  }).catch(function(){ hideLoading(); VM.toast('Không kết nối được máy chủ.','err'); });
+};
+SF.forEach(function(id){
+  var el=document.getElementById(id);
+  if(el) el.addEventListener('input',function(){setErr(id,'');});
+});
+
+var tm=document.getElementById('teacherModal');
+document.getElementById('teacherReg').onclick=function(){tm.classList.add('show');};
+document.getElementById('tClose').onclick=function(e){e.preventDefault();tm.classList.remove('show');};
+
+var TF=['tName','tEmail','tBirth','tPhone','tPw'];
+function validateTeacher(){
+  clearErrs(TF); var ok=true;
+  function req(id,lbl){if(!(document.getElementById(id).value||'').trim()){setErr(id,lbl+' là bắt buộc.');ok=false;}}
+  req('tName','Họ và tên');req('tEmail','Email');req('tBirth','Ngày sinh');req('tPhone','Số điện thoại');
+  var pw=document.getElementById('tPw').value||'';
+  if(!pw.trim()){setErr('tPw','Mật khẩu là bắt buộc.');ok=false;}
+  else if(pw.trim().length<6){setErr('tPw','Mật khẩu phải có ít nhất 6 ký tự.');ok=false;}
+  var email=(document.getElementById('tEmail').value||'').trim();
+  if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){setErr('tEmail','Email không hợp lệ.');ok=false;}
+  return ok;
+}
+document.getElementById('tSubmit').onclick=function(){
+  if(!validateTeacher()) return;
+  showLoading('Đang tạo tài khoản giáo viên…');
+  function trim(id){return (document.getElementById(id).value||'').trim();}
+  VM.api('auth.teacherSignup',{
+    name:trim('tName'),email:trim('tEmail'),birthdate:trim('tBirth'),
+    password:document.getElementById('tPw').value,phone:trim('tPhone')
+  }).then(function(res){
+    hideLoading();
+    if(res&&res.success){
+      VM.session.set(Object.assign({role:'teacher'},res.data),{remember:false});
+      VM.toast('Tạo tài khoản thành công!','ok');
+      setTimeout(function(){location.href=VM.TEACHER_HOME;},600);
+    } else {
+      var msg=(res&&res.error)||'Đăng ký thất bại.';
+      if(msg.toLowerCase().indexOf('email')>-1) setErr('tEmail',msg);
+      else VM.toast(msg,'err',5000);
+    }
+  }).catch(function(){ hideLoading(); VM.toast('Không kết nối được máy chủ.','err'); });
+};
+TF.forEach(function(id){
+  var el=document.getElementById(id);
+  if(el) el.addEventListener('input',function(){setErr(id,'');});
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%231B7F5E'/%3E%3Ctext x='12' y='17' text-anchor='middle' font-size='13' font-weight='700' fill='%23fff' font-family='system-ui'%3EV%3C/text%3E%3C/svg%3E">
+<meta name="theme-color" content="#1B7F5E">
+<title>Đăng nhập · VocabMaster</title>
+<link rel="stylesheet" href="vm-theme.css">
+<style>
+.vm-modal-bg{position:fixed;inset:0;background:rgba(13,79,58,.45);z-index:500;display:none;align-items:center;justify-content:center;padding:20px}
+.vm-modal-bg.show{display:flex}
+</style>
+</head>
+<body>
+
+<div class="vm-loading-overlay" id="loadingOverlay">
+  <span class="vm-spin"></span>
+  <p id="loadingMsg">Đang đăng nhập…</p>
+</div>
+
+<div class="vm-auth-wrap">
+  <div class="vm-auth-card">
+    <div class="vm-auth-head">
+      <div id="brand" style="display:flex;justify-content:center"></div>
+      <h1 class="vm-auth-title">Welcome back</h1>
+      <p class="vm-auth-sub">Đăng nhập để luyện từ vựng.</p>
+    </div>
+
+    <form id="form" autocomplete="on">
+      <div class="vm-field">
+        <label class="vm-label">Student ID hoặc Email</label>
+        <input class="vm-input" id="idInput" placeholder="1234567 hoặc ban@example.com" autocomplete="username">
+        <p style="font-size:.76rem;color:var(--vm-ink-3);margin:6px 0 0">Dùng mã số sinh viên hoặc email đã đăng ký.</p>
+      </div>
+      <div class="vm-field">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <label class="vm-label">Mật khẩu</label>
+          <button type="button" class="vm-pass-toggle" id="pwToggle">show</button>
+        </div>
+        <div class="vm-pass-wrap">
+          <input class="vm-input" id="pw" type="password" placeholder="••••••••" autocomplete="current-password">
+        </div>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:.85rem;color:var(--vm-ink-2);cursor:pointer">
+        <input type="checkbox" id="rememberMe" style="width:16px;height:16px;cursor:pointer">
+        <span>Giữ đăng nhập trên thiết bị này</span>
+      </label>
+      <p style="margin:4px 0 10px;font-size:.75rem;color:var(--vm-ink-3)">⚠️ Bỏ chọn nếu dùng máy tính phòng lab.</p>
+      <button class="vm-btn vm-btn-primary vm-btn-block" id="submit" type="submit">Đăng nhập</button>
+    </form>
+
+    <div style="text-align:right;margin-top:10px">
+      <a href="#" id="forgotStu" style="font-size:.82rem;color:var(--vm-primary);text-decoration:none">Quên mật khẩu?</a>
+    </div>
+    <div style="border-top:1px solid var(--vm-border-2);margin:20px 0 16px"></div>
+    <button class="vm-btn vm-btn-ghost vm-btn-block" id="teacherBtn">🎓 Đăng nhập Giáo viên</button>
+    <p class="vm-auth-alt" style="margin-top:16px">Chưa có tài khoản? <a href="signup.html">Đăng ký</a></p>
+  </div>
+</div>
+
+<!-- Teacher modal -->
+<div class="vm-modal-bg" id="teacherModal">
+  <div class="vm-auth-card" style="max-width:400px;margin:0">
+    <div class="vm-auth-head">
+      <h1 class="vm-auth-title" style="font-size:1.4rem">Đăng nhập Giáo viên</h1>
+      <p class="vm-auth-sub">Đăng nhập bằng email giảng viên.</p>
+    </div>
+    <div class="vm-field">
+      <label class="vm-label">Email</label>
+      <input class="vm-input" id="tEmail" type="email" placeholder="ban@dnpu.edu.vn">
+    </div>
+    <div class="vm-field">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <label class="vm-label">Mật khẩu</label>
+        <button type="button" class="vm-pass-toggle" id="tPwToggle">show</button>
+      </div>
+      <div class="vm-pass-wrap">
+        <input class="vm-input" id="tPw" type="password" placeholder="••••••••">
+      </div>
+    </div>
+    <button class="vm-btn vm-btn-primary vm-btn-block" id="tSubmit" style="margin-top:6px">Đăng nhập</button>
+    <div style="display:flex;justify-content:space-between;margin-top:12px">
+      <a href="#" id="forgotTea" style="font-size:.82rem;color:var(--vm-primary);text-decoration:none">Quên mật khẩu?</a>
+      <a href="#" id="tClose" style="font-size:.82rem;color:var(--vm-ink-3);text-decoration:none">Huỷ</a>
+    </div>
+  </div>
+</div>
+
+<script src="vm-common.js"></script>
+<script>
+if (typeof VM === 'undefined') {
+  document.body.innerHTML = '<div style="max-width:500px;margin:80px auto;padding:30px;border:2px solid #EA4335;border-radius:14px;font-family:system-ui"><h2>Không tải được vm-common.js</h2></div>';
+  throw new Error('no VM');
+}
+document.getElementById('brand').innerHTML = VM.brandLockup();
+
+// Already logged in?
+(function(){ var s=VM.session.get(); if(s&&s.role) location.href=s.role==='teacher'?VM.TEACHER_HOME:VM.STUDENT_HOME; })();
+
+function showLoading(msg){ document.getElementById('loadingMsg').textContent=msg||'Đang đăng nhập…'; document.getElementById('loadingOverlay').classList.add('show'); }
+function hideLoading(){ document.getElementById('loadingOverlay').classList.remove('show'); }
+
+function togglePw(inId,btnId){
+  document.getElementById(btnId).onclick=function(){
+    var inp=document.getElementById(inId), hidden=inp.type==='password';
+    inp.type=hidden?'text':'password'; this.textContent=hidden?'hide':'show';
+  };
+}
+togglePw('pw','pwToggle'); togglePw('tPw','tPwToggle');
+
+var isSub=false;
+document.getElementById('form').onsubmit=function(e){
+  e.preventDefault(); if(isSub) return;
+  var id=(document.getElementById('idInput').value||'').trim();
+  var pw=document.getElementById('pw').value;
+  if(!id||!pw){VM.toast('Vui lòng nhập đầy đủ.','err');return;}
+  isSub=true; showLoading();
+  VM.api('auth.studentLogin',{studentId:id,password:pw}).then(function(res){
+    if(res&&res.success){
+      var r=document.getElementById('rememberMe').checked;
+      VM.session.set(Object.assign({role:'student'},res.data),{remember:r});
+      VM.bumpLoginCount();
+      location.href=VM.STUDENT_HOME;
+    } else {
+      hideLoading(); isSub=false;
+      VM.toast((res&&res.error)||'Đăng nhập thất bại.','err',4000);
+    }
+  }).catch(function(){ hideLoading(); isSub=false; VM.toast('Không kết nối được máy chủ.','err'); });
+};
+
+var tm=document.getElementById('teacherModal');
+document.getElementById('teacherBtn').onclick=function(){ tm.classList.add('show'); };
+document.getElementById('tClose').onclick=function(e){ e.preventDefault(); tm.classList.remove('show'); };
+
+var isTSub=false;
+document.getElementById('tSubmit').onclick=function(){
+  if(isTSub) return;
+  var email=(document.getElementById('tEmail').value||'').trim();
+  var pw=document.getElementById('tPw').value;
+  if(!email||!pw){VM.toast('Nhập email và mật khẩu.','err');return;}
+  isTSub=true; showLoading('Đang xác thực giáo viên…');
+  VM.api('auth.teacherLogin',{email:email,password:pw}).then(function(res){
+    if(res&&res.success){
+      var rm=document.getElementById('rememberMe');
+      VM.session.set(Object.assign({role:'teacher'},res.data),{remember:rm?rm.checked:false});
+      location.href=VM.TEACHER_HOME;
+    } else {
+      hideLoading(); isTSub=false;
+      VM.toast((res&&res.error)||'Đăng nhập thất bại.','err',4000);
+    }
+  }).catch(function(){ hideLoading(); isTSub=false; VM.toast('Không kết nối được máy chủ.','err'); });
+};
+
+function forgot(){
+  var email=prompt('Nhập email đã đăng ký:'); if(!email) return;
+  showLoading('Đang gửi email…');
+  VM.api('auth.forgotPassword',{email:email.trim()}).then(function(res){
+    hideLoading();
+    if(res&&res.success) VM.toast('Đã gửi mật khẩu tới email.','ok',4000);
+    else VM.toast((res&&res.error)||'Không gửi được.','err',4000);
+  }).catch(function(){ hideLoading(); VM.toast('Lỗi kết nối.','err'); });
+}
+document.getElementById('forgotStu').onclick=function(e){e.preventDefault();forgot();};
+document.getElementById('forgotTea').onclick=function(e){e.preventDefault();forgot();};
+</script>
+</body>
+</html>

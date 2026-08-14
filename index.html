@@ -1,0 +1,21 @@
+<!DOCTYPE html><html lang="vi"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%231B7F5E'/%3E%3Ctext x='12' y='17' text-anchor='middle' font-size='13' font-weight='700' fill='%23fff' font-family='system-ui'%3EV%3C/text%3E%3C/svg%3E">
+<meta name="theme-color" content="#1B7F5E">
+<title>VocabMaster</title></head><body>
+<script>
+(function(){
+  var SKEY='vm_session';
+  function clear(){try{localStorage.removeItem(SKEY);}catch(e){}try{sessionStorage.removeItem(SKEY);}catch(e){}}
+  var raw=null;
+  try{raw=sessionStorage.getItem(SKEY)||localStorage.getItem(SKEY);}catch(e){}
+  if(!raw){location.replace('login.html');return;}
+  try{
+    var o=JSON.parse(raw);
+    if(!o||!o.data||!o.exp||Date.now()>o.exp){clear();location.replace('login.html');return;}
+    location.replace(o.data.role==='teacher'?'teacher.html':'student.html');
+  }catch(e){clear();location.replace('login.html');}
+})();
+</script>
+<noscript><meta http-equiv="refresh" content="0;url=login.html"></noscript>
+</body></html>
