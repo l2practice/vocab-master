@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
@@ -10,7 +10,13 @@
 <style>
 #app{min-height:100vh}
 
-/* ─── CEFR Reader ──────────────────────────────── */
+/* Loading overlay */
+.vm-overlay{position:fixed;inset:0;background:rgba(13,79,58,.55);z-index:8888;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px}
+.vm-overlay.show{display:flex}
+.vm-overlay .vm-spin{width:38px;height:38px;border-width:4px}
+.vm-overlay p{color:#fff;font-size:.95rem;font-weight:600;margin:0}
+
+/* CEFR Reader */
 .cefr-shell{display:grid;grid-template-columns:1fr 300px;gap:18px;margin-top:12px}
 .cefr-filterbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--vm-surface);border:1px solid var(--vm-border-2);border-radius:var(--vm-r-sm);padding:9px 12px;margin-bottom:10px;font-size:.8rem}
 .cefr-filterbar label{display:flex;align-items:center;gap:4px;cursor:pointer;font-weight:600;user-select:none;transition:opacity .15s}
@@ -33,37 +39,33 @@
 .cefr-colloc-item{border-left:3px solid var(--vm-accent);padding:6px 9px;margin-bottom:7px;background:var(--vm-surface-2);border-radius:0 5px 5px 0}
 .cefr-colloc-phrase{font-weight:700;font-size:.83rem;color:var(--vm-primary-dk)}
 .cefr-colloc-vi{font-size:.74rem;color:var(--vm-ink-3);margin-top:2px}
-/* Tooltip */
-.cefr-tip{position:fixed;z-index:9990;background:var(--vm-primary-dk);color:#fff;border-radius:10px;padding:10px 14px;font-size:.82rem;max-width:200px;box-shadow:0 8px 30px rgba(0,0,0,.3);pointer-events:auto}
+.cefr-tip{position:fixed;z-index:9990;background:var(--vm-primary-dk);color:#fff;border-radius:10px;padding:10px 14px;font-size:.82rem;max-width:210px;box-shadow:0 8px 30px rgba(0,0,0,.3);pointer-events:auto}
+
 /* Vocab CEFR cards */
 .vm-vocab-cefr-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
 .vm-vocab-cefr-card{background:var(--vm-surface);border:1px solid var(--vm-border-2);border-radius:8px;padding:9px 12px;min-width:130px;max-width:190px;box-shadow:var(--vm-shadow-sm)}
 .vm-vocab-cefr-card .vc-word{font-weight:700;font-size:.92rem;display:flex;align-items:center;gap:5px}
 .vm-vocab-cefr-card .vc-ipa{font-size:.74rem;color:var(--vm-ink-3);margin-top:2px}
-.vm-vocab-cefr-card .vc-syns{font-size:.74rem;color:var(--vm-ink-2);margin-top:3px}
 .vm-vocab-cefr-card .vc-vi{font-size:.78rem;color:var(--vm-primary-dk);margin-top:3px;font-style:italic}
 .vm-cefr-badge{display:inline-block;font-size:.6rem;font-weight:700;padding:1px 5px;border-radius:7px;color:#fff;vertical-align:middle;line-height:1.4}
 
-/* ─── Review Timer ──────────────────────────────── */
-.review-shell{display:grid;grid-template-columns:1fr 280px;gap:16px;height:calc(100vh - 200px);min-height:400px}
+/* Review Timer */
+.review-shell{display:grid;grid-template-columns:1fr 280px;gap:16px;height:calc(100vh - 210px);min-height:380px}
 .review-passage-col{display:flex;flex-direction:column;overflow:hidden}
 .review-passage-body{flex:1;overflow-y:auto;background:var(--vm-surface);border:1px solid var(--vm-border-2);border-radius:var(--vm-r);padding:18px 20px;line-height:2;font-size:.93rem}
 .review-vocab-col{overflow-y:auto;display:flex;flex-direction:column;gap:10px}
 .rv-card{background:var(--vm-surface);border:1px solid var(--vm-border-2);border-radius:var(--vm-r-sm);padding:10px 12px;box-shadow:var(--vm-shadow-sm)}
-.rv-card .rv-word{font-weight:700;font-size:.95rem;color:var(--vm-ink)}
-.rv-card .rv-badge{display:inline-block;font-size:.58rem;font-weight:700;padding:1px 5px;border-radius:6px;color:#fff;margin-left:5px;vertical-align:middle}
+.rv-card .rv-word{font-weight:700;font-size:.95rem;color:var(--vm-ink);display:flex;align-items:center;gap:5px}
+.rv-card .rv-badge{display:inline-block;font-size:.58rem;font-weight:700;padding:1px 5px;border-radius:6px;color:#fff}
 .rv-card .rv-ipa{font-size:.73rem;color:var(--vm-ink-3);margin-top:2px}
 .rv-card .rv-syns{font-size:.75rem;color:var(--vm-ink-2);margin-top:3px}
 .rv-card .rv-vi{font-size:.78rem;color:var(--vm-primary-dk);font-style:italic;margin-top:3px}
-/* Timer bar */
 .timer-bar-wrap{height:6px;background:var(--vm-border-2);border-radius:4px;overflow:hidden;margin-bottom:10px}
 .timer-bar-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--vm-primary),#1BAF80);transition:width 1s linear}
 .timer-bar-fill.warn{background:linear-gradient(90deg,#F59E0B,#EF4444)}
 .timer-info{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;font-size:.82rem;color:var(--vm-ink-2);font-weight:600}
-.timer-skip-btn{background:var(--vm-primary);color:#fff;border:none;border-radius:var(--vm-r-pill);padding:5px 14px;font-size:.78rem;font-weight:600;cursor:pointer;font-family:var(--vm-font-body)}
-.timer-skip-btn:disabled{opacity:.4;cursor:not-allowed}
 
-/* ─── Quiz ──────────────────────────────────────── */
+/* Quiz */
 .vm-quiz-options{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .vm-opt{background:var(--vm-surface-2);border:2px solid var(--vm-border);border-radius:var(--vm-r-sm);padding:14px 16px;cursor:pointer;font-size:.93rem;font-weight:500;transition:border .15s,background .15s;text-align:center;font-family:var(--vm-font-body);-webkit-tap-highlight-color:transparent}
 .vm-opt:active{transform:scale(.97)}
@@ -81,27 +83,43 @@
 @keyframes vm-perfect{0%{transform:scale(1)}50%{transform:scale(1.08)}100%{transform:scale(1)}}
 .vm-perfect-anim{animation:vm-perfect .6s ease}
 
-/* ─── Mobile-first overrides ──────────────────── */
+/* Mobile */
 @media(max-width:640px){
   .cefr-shell{grid-template-columns:1fr}
-  .cefr-right-panel{display:none} /* collapsed on mobile, show via button */
+  .cefr-right-panel{display:none}
   .review-shell{grid-template-columns:1fr;height:auto}
-  .review-passage-body{max-height:45vh}
+  .review-passage-body{max-height:42vh}
   .review-vocab-col{flex-direction:row;flex-wrap:wrap;overflow-x:auto;gap:8px}
-  .rv-card{min-width:140px;max-width:160px;flex:0 0 auto}
+  .rv-card{min-width:140px;flex:0 0 auto}
   .vm-quiz-options{grid-template-columns:1fr}
   .vm-kpi-row{grid-template-columns:repeat(3,1fr)}
-  .vm-kpi-value{font-size:1.5rem}
+  .vm-kpi-value{font-size:1.4rem}
   .vm-assign-grid{grid-template-columns:1fr}
   .vm-content{padding:14px 12px}
   .vm-topbar{padding:12px 14px}
 }
-@media(max-width:400px){
-  .vm-kpi-row{grid-template-columns:1fr 1fr}
-}
+@media(max-width:380px){.vm-kpi-row{grid-template-columns:1fr 1fr}}
+
+/* ReadWise specific */
+.rw-stats-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
+.rw-stat-card{background:var(--vm-surface);border:1px solid var(--vm-border-2);border-radius:var(--vm-r-sm);padding:12px 14px;text-align:center}
+.rw-stat-val{font-family:var(--vm-font-display);font-size:1.6rem;font-weight:700;color:var(--vm-ink)}
+.rw-stat-lbl{font-size:.72rem;color:var(--vm-ink-3);font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-top:3px}
+.rw-article-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.rw-article-card{background:var(--vm-surface);border:2px solid var(--vm-border-2);border-radius:var(--vm-r);padding:18px 20px;cursor:pointer;transition:transform .13s,box-shadow .15s,border-color .15s;box-shadow:var(--vm-shadow-sm)}
+.rw-article-card:hover{transform:translateY(-3px);box-shadow:var(--vm-shadow-lg);border-color:var(--vm-primary)}
+.rw-article-title{font-family:var(--vm-font-display);font-weight:700;font-size:.98rem;color:var(--vm-ink);margin:0 0 6px}
+.rw-article-meta{font-size:.76rem;color:var(--vm-ink-3);display:flex;gap:10px;flex-wrap:wrap}
 </style>
 </head>
 <body>
+
+<!-- Global loading overlay -->
+<div class="vm-overlay" id="globalOverlay">
+  <span class="vm-spin"></span>
+  <p id="overlayMsg">Loading…</p>
+</div>
+
 <div id="app"></div>
 
 <script src="vm-common.js"></script>
@@ -112,29 +130,28 @@ if (typeof VM === 'undefined') { location.href='login.html'; throw new Error('no
 var sess = VM.session.require('student');
 if (!sess) throw new Error('not student');
 var hasCEFR = typeof VMCEFR !== 'undefined';
-
-// ── State ────────────────────────────────────────
-var S = {
-  assignments: [],
-  myResults:   [],
-  quiz: null,
-  quizState: null,
-  activeTab: 'home',
-};
-
-// ── CEFR colors helper ───────────────────────────
 var LC = {'1':'#22C55E','2':'#3B82F6','3':'#F59E0B','4':'#EF4444','5':'#8B5CF6','6':'#EC4899'};
 var LN = {'A1':'1','A2':'2','B1':'3','B2':'4','C1':'5','C2':'6'};
 
-// ── Shell ─────────────────────────────────────────
+/* ── Loading overlay ─────────────────────────── */
+function showOverlay(msg){
+  document.getElementById('overlayMsg').textContent = msg||'Loading…';
+  document.getElementById('globalOverlay').classList.add('show');
+}
+function hideOverlay(){ document.getElementById('globalOverlay').classList.remove('show'); }
+
+/* ── State ───────────────────────────────────── */
+var S = { assignments:[], myResults:[], activeTab:'home' };
+
+/* ── Shell ───────────────────────────────────── */
 VM.renderShell({
-  mount:'app', eyebrow:'VocabMaster', title:'Trang chủ', user:sess,
+  mount:'app', eyebrow:'VocabMaster', title:'Home', user:sess,
   nav:[
-    {id:'home',    label:'Trang chủ', icon:'overview'},
-    {id:'homework',label:'Homework',  icon:'hw'},
-    {id:'inclass', label:'In-class',  icon:'inclass'},
-    {id:'reading', label:'Đọc',       icon:'reading'},
-    {id:'history', label:'Lịch sử',   icon:'results'},
+    {id:'home',    label:'Home',         icon:'overview'},
+    {id:'homework',label:'Homework',      icon:'hw'},
+    {id:'inclass', label:'In-class',      icon:'inclass'},
+    {id:'reading', label:'ReadWise',      icon:'reading'},
+    {id:'history', label:'History',       icon:'results'},
   ],
   onNav: switchTab
 });
@@ -142,14 +159,14 @@ VM.renderShell({
 function switchTab(id){
   S.activeTab=id;
   VM.setActiveNav(id);
-  var titles={home:'Trang chủ',homework:'Homework',inclass:'In-class Review',reading:'Free Reading',history:'Lịch sử'};
+  var titles={home:'Home',homework:'Homework',inclass:'In-class Review',reading:'ReadWise',history:'History'};
   VM.setTitle(titles[id]||id);
   var c=document.getElementById('vmContent');
-  c.innerHTML='<div class="vm-empty" style="padding:40px 20px"><span class="vm-spin-dark" style="width:22px;height:22px;border-width:3px"></span></div>';
+  c.innerHTML='<div class="vm-empty" style="padding:40px"><span class="vm-spin-dark" style="width:22px;height:22px;border-width:3px"></span></div>';
   if(id==='home')      renderHome();
   else if(id==='homework') renderAssignList('homework');
   else if(id==='inclass')  renderAssignList('inclass');
-  else if(id==='reading')  renderReadingList();
+  else if(id==='reading')  renderReadWise();
   else if(id==='history')  renderHistory();
 }
 
@@ -157,16 +174,16 @@ function loadAssignments(cb){
   VM.api('assign.forStudent',{classId:sess.class}).then(function(res){
     if(res&&res.success) S.assignments=res.data||[];
     if(cb) cb();
-  });
+  }).catch(function(){ if(cb) cb(); });
 }
 function loadMyResults(cb){
   VM.api('result.getForStudent',{studentId:sess.studentId}).then(function(res){
     if(res&&res.success) S.myResults=res.data||[];
     if(cb) cb();
-  });
+  }).catch(function(){ if(cb) cb(); });
 }
 
-// ── Home ─────────────────────────────────────────
+/* ── Home ─────────────────────────────────────── */
 function renderHome(){
   loadAssignments(function(){
     loadMyResults(function(){
@@ -177,7 +194,7 @@ function renderHome(){
       c.innerHTML=
         '<div id="vmTodaysWord"></div>'+
         '<div class="vm-kpi-row">'+
-          kpi(hw.length,'Homework','bài')+kpi(ic.length,'In-class','bài')+kpi(done,'Done','homework')+
+          kpi(hw.length,'Homework','open')+kpi(ic.length,'In-class','open')+kpi(done,'Done','homework')+
         '</div>'+
         '<h3 style="font-family:var(--vm-font-display);margin:0 0 12px;font-size:1rem">📝 Homework</h3>'+
         renderCards(hw.slice(0,4))+
@@ -190,18 +207,19 @@ function renderHome(){
 }
 function kpi(v,l,s){
   return '<div class="vm-kpi"><div class="vm-kpi-label">'+l+'</div>'+
-    '<div class="vm-kpi-value">'+v+'</div>'+
-    (s?'<div class="vm-kpi-sub">'+s+'</div>':'')+
+    '<div class="vm-kpi-value">'+v+'</div>'+(s?'<div class="vm-kpi-sub">'+s+'</div>':'')+
   '</div>';
 }
 
-// ── Assignment cards ──────────────────────────────
+/* ── Assignment cards ────────────────────────── */
 function renderAssignList(mode){
+  showOverlay('Loading assignments…');
   loadAssignments(function(){
     loadMyResults(function(){
+      hideOverlay();
       var c=document.getElementById('vmContent');
       var items=S.assignments.filter(function(a){return a.mode===mode;});
-      c.innerHTML=items.length?renderCards(items):'<div class="vm-empty"><p>Chưa có bài tập.</p></div>';
+      c.innerHTML=items.length?renderCards(items):'<div class="vm-empty"><p>No assignments yet.</p></div>';
       bindCards();
     });
   });
@@ -215,20 +233,20 @@ function isPerfectGoalMet(a,res){
 }
 
 function renderCards(items){
-  if(!items.length) return '<div class="vm-empty"><p>Chưa có bài tập.</p></div>';
+  if(!items.length) return '<div class="vm-empty"><p>No assignments.</p></div>';
   return '<div class="vm-assign-grid">'+items.map(function(a){
     var res=myResultsFor(a.assignmentId);
     var att=res.length, perf=res.filter(function(r){return r.isPerfect;}).length;
     var req=parseInt(a.requiredGoals,10)||3;
     var done=a.mode==='homework'&&perf>=req;
     var pct=a.mode==='homework'?Math.min(100,Math.round(perf/req*100)):0;
-    var dl=a.deadline?'⏰ '+VM.esc(a.deadline):'∞ Không giới hạn';
+    var dl=a.deadline?'⏰ '+VM.esc(a.deadline):'∞ No deadline';
     return '<div class="vm-assign-card'+(done?' complete':'')+'" data-open-asgn="'+VM.esc(a.assignmentId)+'">'+
       '<div style="display:flex;justify-content:space-between;gap:8px">'+
         '<div class="vm-assign-card-title">'+VM.esc(a.title)+'</div>'+
         (done?'<span style="color:var(--vm-ok);font-size:1.1rem;flex:0 0 auto">✓</span>':'')+
       '</div>'+
-      '<div class="vm-assign-meta"><span>📚 '+(a.vocab||[]).length+' từ</span><span>'+dl+'</span></div>'+
+      '<div class="vm-assign-meta"><span>📚 '+(a.vocab||[]).length+' words</span><span>'+dl+'</span></div>'+
       (a.mode==='homework'?
         '<div class="vm-assign-progress">'+
           '<div style="display:flex;justify-content:space-between;font-size:.76rem;font-weight:600">'+
@@ -238,10 +256,11 @@ function renderCards(items){
           '<div class="vm-assign-pbar"><div class="vm-assign-pfill'+(done?' done':'')+'" style="width:'+pct+'%"></div></div>'+
         '</div>':
         '<div style="font-size:.76rem;color:var(--vm-ink-3)">Attempts: '+att+'</div>')+
-      '<button class="vm-btn vm-btn-primary vm-btn-block" style="padding:10px;font-size:.88rem;margin-top:6px">'+(att?'Làm lại →':'Bắt đầu →')+'</button>'+
+      '<button class="vm-btn vm-btn-primary vm-btn-block" style="padding:10px;font-size:.88rem;margin-top:6px">'+(att?'Try again →':'Start →')+'</button>'+
     '</div>';
   }).join('')+'</div>';
 }
+
 function bindCards(){
   VM.els('[data-open-asgn]').forEach(function(card){
     card.onclick=function(){
@@ -254,36 +273,30 @@ function bindCards(){
   });
 }
 
-// ── REVIEW SCREEN (6-min mandatory read before quiz) ──────
+/* ── Review (6-min mandatory read) ──────────── */
 var _reviewTimer=null;
 function openReview(asgn){
   var c=document.getElementById('vmContent');
   VM.setTitle(asgn.title);
-
   var res=myResultsFor(asgn.assignmentId);
   var hasPerfect=res.filter(function(r){return r.isPerfect;}).length>0;
-  var REVIEW_SEC=360; // 6 minutes
+  var REVIEW_SEC=360;
   var remaining=REVIEW_SEC;
-  var canSkip=hasPerfect;
-
   var vocab=asgn.vocab||[];
   var passage=asgn.reading||'';
 
-  // Build passage HTML with CEFR if available
   var passageHtml;
   if(hasCEFR&&passage){
     var meanings={};
     vocab.forEach(function(v){ if(v.vi||v.meaningVi) meanings[(v.word||'').toLowerCase()]={vi:v.vi||v.meaningVi||'',ipa:v.ipa||''}; });
     passageHtml=VMCEFR.renderPassage(passage,{
       visibleLevels:{A1:false,A2:false,B1:true,B2:true,C1:true,C2:true},
-      meanings:meanings,
-      vocabHighlight:vocab.map(function(v){return v.word;})
+      meanings:meanings, vocabHighlight:vocab.map(function(v){return v.word;})
     });
   } else {
-    passageHtml=passage?VM.esc(passage).replace(/\n/g,'<br>'):'<span style="color:var(--vm-ink-3);font-style:italic">Không có đoạn đọc.</span>';
+    passageHtml=passage?VM.esc(passage).replace(/\n/g,'<br>'):'<em style="color:var(--vm-ink-3)">No reading passage.</em>';
   }
 
-  // Vocab sidebar
   var vocabHtml=vocab.map(function(v){
     var lemma=hasCEFR?VMCEFR.lemmatize((v.word||'').toLowerCase()):null;
     var entry=lemma&&typeof CEFR_MAP!=='undefined'?CEFR_MAP[lemma]:null;
@@ -305,99 +318,79 @@ function openReview(asgn){
   c.innerHTML=
     '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="rvBack" style="margin-bottom:12px">← Back</button>'+
     '<div class="timer-info">'+
-      '<span id="rvLabel">📖 Đọc và ôn từ vựng trước khi làm bài</span>'+
-      '<span id="rvTime" style="font-size:1rem;font-family:var(--vm-font-display)"></span>'+
+      '<span id="rvLabel">📖 Read & review vocabulary before the quiz</span>'+
+      '<span id="rvTime" style="font-size:1rem;font-family:var(--vm-font-display)">6:00</span>'+
     '</div>'+
     '<div class="timer-bar-wrap"><div class="timer-bar-fill" id="rvBar" style="width:100%"></div></div>'+
     '<div class="review-shell">'+
       '<div class="review-passage-col">'+
         '<div class="review-passage-body" id="rvPassage">'+
           '<h3 style="font-family:var(--vm-font-display);font-size:1rem;margin:0 0 12px;color:var(--vm-primary-dk)">📖 '+VM.esc(asgn.title)+'</h3>'+
-          (passage?passageHtml:'<span style="color:var(--vm-ink-3);font-style:italic">Không có đoạn đọc.</span>')+
+          (passage?passageHtml:'<em style="color:var(--vm-ink-3)">No reading passage for this assignment.</em>')+
         '</div>'+
       '</div>'+
       '<div class="review-vocab-col">'+
-        '<div style="font-size:.75rem;font-weight:700;color:var(--vm-ink-3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Từ mục tiêu</div>'+
-        (vocabHtml||'<div style="color:var(--vm-ink-3);font-size:.82rem">Không có từ.</div>')+
+        '<div style="font-size:.72rem;font-weight:700;color:var(--vm-ink-3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Target Words</div>'+
+        (vocabHtml||'<div style="color:var(--vm-ink-3);font-size:.82rem">No vocabulary.</div>')+
       '</div>'+
     '</div>'+
     '<div style="text-align:center;margin-top:16px">'+
-      '<button class="vm-btn vm-btn-primary" id="rvStart" style="padding:13px 32px;font-size:1rem" disabled>'+
-        '⏳ Chờ '+REVIEW_SEC+' giây…'+
-      '</button>'+
-      (canSkip?'<br><button class="vm-btn vm-btn-ghost vm-btn-sm" id="rvSkip" style="margin-top:8px">Bỏ qua (đã đạt 100%)</button>':'')+
+      '<button class="vm-btn vm-btn-primary" id="rvStart" style="padding:13px 32px;font-size:1rem" disabled>⏳ Please wait…</button>'+
+      (hasPerfect?'<br><button class="vm-btn vm-btn-ghost vm-btn-sm" id="rvSkip" style="margin-top:8px">Skip review (already scored 100%)</button>':'')+
     '</div>';
 
-  document.getElementById('rvBack').onclick=function(){ clearTimerReview(); switchTab(S.activeTab); };
-  if(canSkip) document.getElementById('rvSkip').onclick=function(){ clearTimerReview(); openQuizDirect(asgn); };
+  document.getElementById('rvBack').onclick=function(){ clearReviewTimer(); switchTab(S.activeTab); };
+  if(hasPerfect) document.getElementById('rvSkip').onclick=function(){ clearReviewTimer(); openQuizDirect(asgn); };
 
-  // CEFR word tooltips in passage
   if(hasCEFR){
     setTimeout(function(){
-      var meanings2={};
-      vocab.forEach(function(v){ meanings2[(v.word||'').toLowerCase()]={vi:v.vi||v.meaningVi||'',ipa:v.ipa||''}; });
+      var m2={};
+      vocab.forEach(function(v){ m2[(v.word||'').toLowerCase()]={vi:v.vi||v.meaningVi||'',ipa:v.ipa||''}; });
       VM.els('.vm-cefr-word').forEach(function(span){
-        span.onclick=function(){
-          showCEFRTip(span,span.getAttribute('data-word'),span.getAttribute('data-lemma'),span.getAttribute('data-level'),meanings2[span.getAttribute('data-word').toLowerCase()]||null);
-        };
+        span.onclick=function(){ showCEFRTip(span,span.getAttribute('data-word'),span.getAttribute('data-level'),m2[span.getAttribute('data-word').toLowerCase()]||null); };
       });
     },100);
   }
 
-  // Timer
   if(_reviewTimer) clearInterval(_reviewTimer);
   _reviewTimer=setInterval(function(){
     remaining--;
     var bar=document.getElementById('rvBar');
     var timeEl=document.getElementById('rvTime');
     var startBtn=document.getElementById('rvStart');
-    if(!bar||!timeEl||!startBtn){clearInterval(_reviewTimer);return;}
+    if(!bar){clearInterval(_reviewTimer);return;}
     var pct=Math.round(remaining/REVIEW_SEC*100);
     bar.style.width=pct+'%';
     if(remaining<=60) bar.classList.add('warn');
-    var m=Math.floor(remaining/60), s=remaining%60;
-    timeEl.textContent=m+':'+(s<10?'0':'')+s;
+    var m=Math.floor(remaining/60),s=remaining%60;
+    if(timeEl) timeEl.textContent=m+':'+(s<10?'0':'')+s;
     if(remaining<=0){
       clearInterval(_reviewTimer);
-      startBtn.disabled=false;
-      startBtn.textContent='▶ Bắt đầu làm bài';
-      timeEl.textContent='';
-      document.getElementById('rvLabel').textContent='✅ Sẵn sàng làm bài!';
+      if(startBtn){startBtn.disabled=false;startBtn.textContent='▶ Start Quiz';}
+      if(timeEl) timeEl.textContent='';
+      var lbl=document.getElementById('rvLabel');
+      if(lbl) lbl.textContent='✅ Ready to start!';
     } else {
-      startBtn.textContent='⏳ Còn '+remaining+'s…';
+      if(startBtn) startBtn.textContent='⏳ '+remaining+'s remaining…';
     }
   },1000);
-  // Initial time display
-  var m0=Math.floor(remaining/60),s0=remaining%60;
-  document.getElementById('rvTime').textContent=m0+':'+(s0<10?'0':'')+s0;
 
-  document.getElementById('rvStart').onclick=function(){
-    clearTimerReview();
-    openQuizDirect(asgn);
-  };
+  document.getElementById('rvStart').onclick=function(){ clearReviewTimer(); openQuizDirect(asgn); };
 }
-function clearTimerReview(){ if(_reviewTimer){clearInterval(_reviewTimer);_reviewTimer=null;} }
+function clearReviewTimer(){ if(_reviewTimer){clearInterval(_reviewTimer);_reviewTimer=null;} }
 
-// ── Quiz direct (inclass or after review) ─────────
+/* ── Quiz ─────────────────────────────────────── */
 function openQuizDirect(asgn){
-  clearTimerReview();
+  clearReviewTimer();
   var c=document.getElementById('vmContent');
   VM.setTitle(asgn.title);
-  var modes=[
-    {id:'choice',label:'✦ MCQ'},
-    {id:'blank', label:'✍ Fill Blank'},
-    {id:'spell', label:'🔤 Spell'},
-  ];
+  var modes=[{id:'choice',label:'✦ MCQ'},{id:'blank',label:'✍ Fill Blank'},{id:'spell',label:'🔤 Spell'}];
   c.innerHTML=
     '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="qBack" style="margin-bottom:12px">← Back</button>'+
     '<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">'+
-      modes.map(function(m){
-        return '<button class="vm-mode-chip'+(m.id==='choice'?' active':'')+'" data-qmode="'+m.id+'">'+m.label+'</button>';
-      }).join('')+
-    '</div>'+
-    '<div id="quizArea"></div>';
-
-  document.getElementById('qBack').onclick=function(){ S.quiz=null; S.quizState=null; switchTab(S.activeTab); };
+      modes.map(function(m){return '<button class="vm-mode-chip'+(m.id==='choice'?' active':'')+'" data-qmode="'+m.id+'">'+m.label+'</button>';}).join('')+
+    '</div><div id="quizArea"></div>';
+  document.getElementById('qBack').onclick=function(){ S.quiz=null; switchTab(S.activeTab); };
   var curMode='choice';
   VM.els('[data-qmode]').forEach(function(btn){
     btn.onclick=function(){
@@ -411,21 +404,20 @@ function openQuizDirect(asgn){
 
 function startQuiz(asgn,mode){
   var vocab=asgn.vocab||[];
-  if(!vocab.length){document.getElementById('quizArea').innerHTML='<div class="vm-empty"><p>Chưa có từ vựng.</p></div>';return;}
+  if(!vocab.length){document.getElementById('quizArea').innerHTML='<div class="vm-empty"><p>No vocabulary in this assignment.</p></div>';return;}
   S.quiz=VM.buildQuiz(vocab,{mode:mode,shuffle:true});
-  S.quizState={asgn:asgn,qIdx:0,correct:0,selected:null,startTs:Date.now(),quizMode:mode};
+  S.quizState={asgn:asgn,qIdx:0,correct:0,startTs:Date.now(),quizMode:mode};
   renderQ();
 }
 
 function renderQ(){
-  var qs=S.quizState, q=S.quiz.questions[qs.qIdx], total=S.quiz.questions.length;
+  var qs=S.quizState,q=S.quiz.questions[qs.qIdx],total=S.quiz.questions.length;
   var pct=Math.round(qs.qIdx/total*100);
-  var isChoiceMode=S.quiz.mode==='choice'||S.quiz.mode==='match';
+  var isChoice=S.quiz.mode==='choice'||S.quiz.mode==='match';
   document.getElementById('quizArea').innerHTML=
     '<div class="vm-quiz-wrap">'+
       '<div class="vm-quiz-header">'+
-        '<div class="vm-quiz-progress">'+
-          'Câu '+(qs.qIdx+1)+'/'+total+
+        '<div class="vm-quiz-progress">Question '+(qs.qIdx+1)+'/'+total+
           '<div class="vm-quiz-bar"><div class="vm-quiz-bar-fill" style="width:'+pct+'%"></div></div>'+
         '</div>'+
         '<span style="font-size:.8rem;color:var(--vm-ink-3)">✓ '+qs.correct+'</span>'+
@@ -434,49 +426,36 @@ function renderQ(){
         '<div class="vm-quiz-q">'+VM.esc(q.prompt)+'</div>'+
         (q.subprompt&&q.subprompt!==q.prompt?'<div class="vm-quiz-hint">'+VM.esc(q.subprompt)+'</div>':'')+
         (q.hint?'<div class="vm-quiz-hint">'+VM.esc(q.hint)+'</div>':'')+
-        buildInput(q, isChoiceMode)+
+        buildInput(q,isChoice)+
       '</div>'+
     '</div>';
-  bindInput(q, isChoiceMode);
+  bindInput(q,isChoice);
 }
 
-function buildInput(q, isChoice){
+function buildInput(q,isChoice){
   if(isChoice)
     return '<div class="vm-quiz-options">'+
-      q.options.map(function(opt){
-        return '<button class="vm-opt" data-ans="'+VM.esc(opt)+'">'+VM.esc(opt)+'</button>';
-      }).join('')+
-    '</div>'+
+      q.options.map(function(opt){return '<button class="vm-opt" data-ans="'+VM.esc(opt)+'">'+VM.esc(opt)+'</button>';}).join('')+
+    '</div><div class="vm-quiz-fb" id="qFb"></div>'+
+    '<button class="vm-btn vm-btn-primary vm-quiz-submit" id="qSubmit" disabled>Confirm</button>';
+  return '<input class="vm-quiz-input" id="qInput" placeholder="Type your answer…" autocomplete="off" spellcheck="false">'+
     '<div class="vm-quiz-fb" id="qFb"></div>'+
-    '<button class="vm-btn vm-btn-primary vm-quiz-submit" id="qSubmit" disabled>Xác nhận</button>';
-  return '<input class="vm-quiz-input" id="qInput" placeholder="Nhập đáp án…" autocomplete="off" spellcheck="false">'+
-    '<div class="vm-quiz-fb" id="qFb"></div>'+
-    '<button class="vm-btn vm-btn-primary vm-quiz-submit" id="qSubmit" style="margin-top:12px">Xác nhận</button>';
+    '<button class="vm-btn vm-btn-primary vm-quiz-submit" id="qSubmit" style="margin-top:12px" disabled>Confirm</button>';
 }
 
-function bindInput(q, isChoice){
-  var answered=false;
-  var selected=null;
-
+function bindInput(q,isChoice){
+  var answered=false,selected=null;
   function confirm(){
-    if(answered||(!selected&&!isChoice)) return;
-    // For type-in, read input value
-    if(!isChoice){
-      var inp=document.getElementById('qInput');
-      if(!inp||!inp.value.trim()) return;
-      selected=inp.value.trim();
-    }
-    if(!selected) return;
+    if(answered) return;
+    if(isChoice&&!selected) return;
+    if(!isChoice){var inp=document.getElementById('qInput');if(!inp||!inp.value.trim()) return;selected=inp.value.trim();}
     answered=true;
-    var res=S.quiz.check(S.quizState.qIdx, selected);
-    var fb=document.getElementById('qFb');
-    var sub=document.getElementById('qSubmit');
-    if(sub){sub.disabled=true;sub.textContent='Đã nộp';}
-
+    var res=S.quiz.check(S.quizState.qIdx,selected);
+    var fb=document.getElementById('qFb'),sub=document.getElementById('qSubmit');
+    if(sub){sub.disabled=true;sub.textContent='Submitted';}
     if(isChoice){
       VM.els('[data-ans]').forEach(function(btn){
-        btn.disabled=true;
-        btn.classList.remove('selected');
+        btn.disabled=true;btn.classList.remove('selected');
         if(btn.getAttribute('data-ans')===q.answer) btn.classList.add('correct');
         else if(btn.getAttribute('data-ans')===selected&&!res.correct) btn.classList.add('wrong');
       });
@@ -484,17 +463,14 @@ function bindInput(q, isChoice){
       var inp2=document.getElementById('qInput');
       if(inp2){inp2.disabled=true;inp2.classList.add(res.correct?'correct':'wrong');}
     }
-
-    if(fb){fb.className='vm-quiz-fb '+(res.correct?'ok':'bad');fb.textContent=res.correct?'✓ Đúng!':'✗ Đáp án: '+res.correctAnswer;}
+    if(fb){fb.className='vm-quiz-fb '+(res.correct?'ok':'bad');fb.textContent=res.correct?'✓ Correct!':'✗ Answer: '+res.correctAnswer;}
     if(res.correct) S.quizState.correct++;
-
     setTimeout(function(){
       S.quizState.qIdx++;
       if(S.quizState.qIdx>=S.quiz.questions.length) showResult();
       else renderQ();
-    }, res.correct?900:1800);
+    },res.correct?900:1800);
   }
-
   if(isChoice){
     VM.els('[data-ans]').forEach(function(btn){
       btn.onclick=function(){
@@ -502,7 +478,6 @@ function bindInput(q, isChoice){
         selected=btn.getAttribute('data-ans');
         VM.els('[data-ans]').forEach(function(b){b.classList.remove('selected');});
         btn.classList.add('selected');
-        // Enable submit
         var sub=document.getElementById('qSubmit');
         if(sub) sub.disabled=false;
       };
@@ -510,32 +485,32 @@ function bindInput(q, isChoice){
     var sub=document.getElementById('qSubmit');
     if(sub) sub.onclick=confirm;
   } else {
-    var inp=document.getElementById('qInput');
-    var sub2=document.getElementById('qSubmit');
+    var inp=document.getElementById('qInput'),sub2=document.getElementById('qSubmit');
     if(inp){
       inp.focus();
-      inp.oninput=function(){
-        if(sub2) sub2.disabled=!inp.value.trim();
-      };
-      inp.onkeydown=function(e){if(e.key==='Enter'&&!sub2.disabled) confirm();};
+      inp.oninput=function(){if(sub2) sub2.disabled=!inp.value.trim();};
+      inp.onkeydown=function(e){if(e.key==='Enter'&&sub2&&!sub2.disabled) confirm();};
     }
-    if(sub2){sub2.disabled=true;sub2.onclick=confirm;}
+    if(sub2){sub2.onclick=confirm;}
   }
 }
 
 function showResult(){
-  var qs=S.quizState, total=S.quiz.questions.length;
-  var score=Math.round(qs.correct/total*100), isPerfect=score===100;
+  var qs=S.quizState,total=S.quiz.questions.length;
+  var score=Math.round(qs.correct/total*100),isPerfect=score===100;
   var dur=Math.round((Date.now()-qs.startTs)/1000);
   var asgn=qs.asgn;
-  // Save
+  showOverlay('Saving result…');
   VM.api('result.save',{
     studentId:sess.studentId,name:sess.name,class:sess.class||asgn.classId,
     assignmentId:asgn.assignmentId,title:asgn.title,mode:asgn.mode,
     score:score,isPerfect:isPerfect,durationSec:dur,correct:qs.correct,total:total
-  }).then(function(r){ if(r&&r.success) loadMyResults(function(){}); });
+  }).then(function(r){
+    hideOverlay();
+    if(r&&r.success) loadMyResults(function(){});
+    else VM.toast('Failed to save result.','err');
+  }).catch(function(){ hideOverlay(); VM.toast('Connection error.','err'); });
 
-  // Compute fresh
   var lr=S.myResults.filter(function(r){return r.assignmentId===asgn.assignmentId;});
   var perfects=lr.filter(function(r){return r.isPerfect;}).length+(isPerfect?1:0);
   var attempts=lr.length+1;
@@ -547,21 +522,19 @@ function showResult(){
     '<div class="vm-result-banner'+(isPerfect?' vm-perfect-anim':'')+'" style="margin-top:8px">'+
       (isPerfect?'<div style="font-size:2.4rem;margin-bottom:6px">🎉</div>':'')+
       '<div class="vm-result-score" style="color:'+sc+'">'+score+'%</div>'+
-      '<div class="vm-result-label">'+qs.correct+'/'+total+' câu đúng</div>'+
+      '<div class="vm-result-label">'+qs.correct+'/'+total+' correct</div>'+
       '<div class="vm-result-badges" style="margin-top:14px">'+
-        bdg(VM.fmtDuration(dur),'Thời gian')+
+        bdg(VM.fmtDuration(dur),'Duration')+
         (asgn.mode==='homework'?
           bdg(attempts,'Attempts')+
-          '<div class="vm-result-badge">'+
-            '<div class="val" style="color:'+(goalMet?'var(--vm-ok)':'var(--vm-ink)')+'">'+perfects+'/'+req+'</div>'+
-            '<div class="lbl">Goals'+(goalMet?' ✓':'')+'</div>'+
-          '</div>':'') +
+          '<div class="vm-result-badge"><div class="val" style="color:'+(goalMet?'var(--vm-ok)':'var(--vm-ink)')+'">'+perfects+'/'+req+'</div>'+
+          '<div class="lbl">Goals'+(goalMet?' ✓':'')+'</div></div>':'') +
       '</div>'+
-      (goalMet?'<div style="margin-top:14px;color:var(--vm-ok);font-weight:700;font-size:.95rem">🏆 Hoàn thành mục tiêu!</div>':
-        (asgn.mode==='homework'?'<div style="margin-top:8px;font-size:.82rem;color:var(--vm-ink-3)">Cần '+(req-perfects)+' lần 100% nữa.</div>':''))+
+      (goalMet?'<div style="margin-top:14px;color:var(--vm-ok);font-weight:700">🏆 Goal achieved!</div>':
+        (asgn.mode==='homework'?'<div style="margin-top:8px;font-size:.82rem;color:var(--vm-ink-3)">Need '+(req-perfects)+' more 100% run(s).</div>':''))+
       '<div style="display:flex;gap:10px;justify-content:center;margin-top:18px;flex-wrap:wrap">'+
-        '<button class="vm-btn vm-btn-primary" id="tryAgain" style="padding:11px 24px">Làm lại</button>'+
-        '<button class="vm-btn vm-btn-ghost" id="backRes" style="padding:11px 20px">← Về danh sách</button>'+
+        '<button class="vm-btn vm-btn-primary" id="tryAgain" style="padding:11px 24px">Try Again</button>'+
+        '<button class="vm-btn vm-btn-ghost" id="backRes" style="padding:11px 20px">← Back</button>'+
       '</div>'+
     '</div>';
   document.getElementById('tryAgain').onclick=function(){startQuiz(asgn,qs.quizMode);};
@@ -571,66 +544,108 @@ function bdg(v,l){
   return '<div class="vm-result-badge"><div class="val">'+VM.esc(String(v))+'</div><div class="lbl">'+VM.esc(l)+'</div></div>';
 }
 
-// ── CEFR tooltip ──────────────────────────────────
-function showCEFRTip(anchor, word, lemma, level, mData){
+/* ── CEFR tooltip ────────────────────────────── */
+function showCEFRTip(anchor,word,level,mData){
   var old=document.getElementById('cefrTip'); if(old) old.remove();
   var lnum=level&&LN[level]?LN[level]:(level&&/^\d$/.test(level)?level:null);
   var col=lnum?LC[lnum]:'#666';
   var tip=document.createElement('div');
-  tip.id='cefrTip'; tip.className='cefr-tip';
+  tip.id='cefrTip';tip.className='cefr-tip';
   tip.innerHTML=
     '<div style="display:flex;align-items:center;gap:7px;margin-bottom:5px">'+
       '<b style="font-size:.95rem">'+VM.esc(word)+'</b>'+
       (level?'<span style="background:'+col+';color:#fff;padding:2px 6px;border-radius:7px;font-size:.65rem;font-weight:700">'+level+'</span>':'')+
-      '<button onclick="document.getElementById(\'cefrTip\').remove()" style="margin-left:auto;background:none;border:none;color:rgba(255,255,255,.6);cursor:pointer;font-size:1rem;line-height:1;padding:0">×</button>'+
+      '<button onclick="document.getElementById(\'cefrTip\').remove()" style="margin-left:auto;background:none;border:none;color:rgba(255,255,255,.6);cursor:pointer;font-size:1rem;padding:0">×</button>'+
     '</div>'+
     (mData&&mData.ipa?'<div style="color:#A8E8C8;font-size:.77rem">/'+VM.esc(mData.ipa)+'/</div>':'')+
-    (mData&&mData.vi?'<div style="color:#E0F8EE;margin-top:3px">🇻🇳 '+VM.esc(mData.vi)+'</div>':'<div style="color:rgba(255,255,255,.5);font-size:.74rem;margin-top:3px;font-style:italic">Chưa có nghĩa</div>');
+    (mData&&mData.vi?'<div style="color:#E0F8EE;margin-top:3px">🇻🇳 '+VM.esc(mData.vi)+'</div>':'<div style="color:rgba(255,255,255,.5);font-size:.74rem;margin-top:3px;font-style:italic">No translation yet</div>');
   document.body.appendChild(tip);
   var r=anchor.getBoundingClientRect();
-  var tw=Math.min(200,tip.scrollWidth), th=tip.scrollHeight;
+  var tw=Math.min(210,tip.scrollWidth),th=tip.scrollHeight;
   var left=Math.max(8,Math.min(r.left+r.width/2-tw/2,window.innerWidth-tw-8));
-  var top=r.top-th-8; if(top<8) top=r.bottom+8;
-  tip.style.left=left+'px'; tip.style.top=top+'px';
+  var top=r.top-th-8;if(top<8) top=r.bottom+8;
+  tip.style.left=left+'px';tip.style.top=top+'px';
   setTimeout(function(){
-    document.addEventListener('click',function ct(e){ if(!tip.contains(e.target)&&e.target!==anchor){tip.remove();document.removeEventListener('click',ct);} });
+    document.addEventListener('click',function ct(e){if(!tip.contains(e.target)&&e.target!==anchor){tip.remove();document.removeEventListener('click',ct);}});
   },10);
 }
 
-// ── Free Reading ──────────────────────────────────
-function renderReadingList(){
-  var c=document.getElementById('vmContent');
-  c.innerHTML='<div id="rwList"><div class="vm-empty" style="padding:40px"><span class="vm-spin-dark" style="width:20px;height:20px;border-width:3px"></span></div></div>';
-  loadAssignments(function(){
-    var items=S.assignments.filter(function(a){return a.reading&&a.reading.trim();});
-    var box=document.getElementById('rwList');
-    if(!items.length){box.innerHTML='<div class="vm-empty"><p>Chưa có bài đọc.</p></div>';return;}
-    box.innerHTML='<div class="vm-assign-grid">'+items.map(function(a){
-      return '<div class="vm-assign-card" data-read-open="'+VM.esc(a.assignmentId)+'">'+
-        '<div class="vm-assign-card-title">'+VM.esc(a.title)+'</div>'+
-        '<div class="vm-assign-meta"><span>📖 Đoạn đọc</span><span>📚 '+(a.vocab||[]).length+' từ</span></div>'+
-        '<button class="vm-btn vm-btn-ghost vm-btn-block" style="padding:9px;font-size:.88rem;margin-top:6px">Đọc & Phân tích →</button>'+
+/* ── ReadWise (self-directed, independent of assignments) ─── */
+// ReadWise uses a separate vocab sheet tab — students pick their own articles.
+// For now we source articles from assignments that have reading passages,
+// but present them as independent reading material (not tied to homework grades).
+// Results saved under mode:'readwise' — teacher sees date/time/quiz scores.
+var RW_VOCAB_COUNT = 60;   // always pull 60 vocab words
+var RW_COMP_COUNT  = 15;   // always 15 comprehension questions
+
+function renderReadWise(){
+  showOverlay('Loading ReadWise…');
+  VM.api('assign.forStudent',{classId:sess.class}).then(function(res){
+    hideOverlay();
+    var c=document.getElementById('vmContent');
+    var articles=(res&&res.success?res.data||[]:S.assignments).filter(function(a){return a.reading&&a.reading.trim();});
+
+    // Stats from readwise history
+    var rwRes=S.myResults.filter(function(r){return r.mode==='readwise';});
+    var totalRead=new Set(rwRes.map(function(r){return r.assignmentId;})).size;
+    var avgScore=rwRes.length?Math.round(rwRes.reduce(function(s,r){return s+parseFloat(r.score||0);},0)/rwRes.length):0;
+
+    if(!articles.length){
+      c.innerHTML=
+        '<div class="rw-stats-row">'+
+          rwStat(totalRead,'Articles read')+rwStat(avgScore+'%','Avg. score')+
+        '</div>'+
+        '<div class="vm-empty"><p>No reading articles available yet. Your teacher will add them.</p></div>';
+      return;
+    }
+
+    c.innerHTML=
+      '<div class="rw-stats-row">'+
+        rwStat(totalRead,'Articles read')+rwStat(avgScore+'%','Avg. score')+
+      '</div>'+
+      '<h3 style="font-family:var(--vm-font-display);margin:0 0 14px;font-size:1rem">📚 Available Articles</h3>'+
+      '<div class="rw-article-grid">'+
+        articles.map(function(a){
+          var myRW=rwRes.filter(function(r){return r.assignmentId===a.assignmentId;});
+          var attempts=myRW.length;
+          var bestScore=attempts?Math.max.apply(null,myRW.map(function(r){return parseFloat(r.score||0);})):null;
+          return '<div class="rw-article-card" data-rw-open="'+VM.esc(a.assignmentId)+'">'+
+            '<div class="rw-article-title">'+VM.esc(a.title)+'</div>'+
+            '<div class="rw-article-meta">'+
+              '<span>📖 Reading</span>'+
+              '<span>📚 '+(a.vocab||[]).length+' words</span>'+
+              (attempts?'<span>✓ '+attempts+' attempt(s) · Best: '+bestScore+'%</span>':'<span>Not started</span>')+
+            '</div>'+
+            '<button class="vm-btn '+(attempts?'vm-btn-ghost':'vm-btn-primary')+' vm-btn-block" style="padding:9px;font-size:.88rem;margin-top:10px">'+
+              (attempts?'Read again →':'Start reading →')+
+            '</button>'+
+          '</div>';
+        }).join('')+
       '</div>';
-    }).join('')+'</div>';
-    VM.els('[data-read-open]').forEach(function(card){
+
+    VM.els('[data-rw-open]').forEach(function(card){
       card.onclick=function(){
-        var a=S.assignments.find(function(x){return x.assignmentId===card.getAttribute('data-read-open');});
-        if(a) openCEFRReader(a);
+        var a=articles.find(function(x){return x.assignmentId===card.getAttribute('data-rw-open');});
+        if(a) openRWArticle(a);
       };
     });
+  }).catch(function(){
+    hideOverlay();
+    document.getElementById('vmContent').innerHTML='<div class="vm-empty"><p>Connection error. Please try again.</p></div>';
   });
 }
+function rwStat(v,l){
+  return '<div class="rw-stat-card"><div class="rw-stat-val">'+VM.esc(String(v))+'</div><div class="rw-stat-lbl">'+VM.esc(l)+'</div></div>';
+}
 
-function openCEFRReader(asgn){
+function openRWArticle(asgn){
   var c=document.getElementById('vmContent');
   VM.setTitle(asgn.title);
+  var vocab=asgn.vocab||[];
   var vis={A1:true,A2:true,B1:true,B2:true,C1:true,C2:true};
   var meanings={};
-  var collocs=[];
-  var gemKey=VM.geminiKey.get();
-  var vocab=asgn.vocab||[];
-  // Pre-fill meanings from vocab list
   vocab.forEach(function(v){ meanings[(v.word||'').toLowerCase()]={vi:v.vi||v.meaningVi||'',ipa:v.ipa||''}; });
+  var gemKey=VM.geminiKey.get();
 
   function buildPassage(){
     if(!hasCEFR) return VM.esc(asgn.reading||'').replace(/\n/g,'<br>');
@@ -638,29 +653,22 @@ function openCEFRReader(asgn){
   }
 
   function buildBD(){
-    if(!hasCEFR) return '';
-    var tk=VMCEFR.analyze(asgn.reading||'');
-    var bd=VMCEFR.breakdown(tk);
+    if(!hasCEFR||!asgn.reading) return '';
+    var tk=VMCEFR.analyze(asgn.reading);var bd=VMCEFR.breakdown(tk);
     var lvs=['A1','A2','B1','B2','C1','C2'];
     return '<div class="cefr-breakdown"><h4>CEFR Breakdown</h4>'+
       lvs.map(function(lv){
-        var count=bd[lv]||0, pct=bd.total?Math.round(count/bd.total*100):0;
-        var col=LC[LN[lv]];
-        return '<div class="cefr-bd-row">'+
-          '<span class="lbl" style="color:'+col+'">'+lv+'</span>'+
+        var count=bd[lv]||0,pct=bd.total?Math.round(count/bd.total*100):0,col=LC[LN[lv]];
+        return '<div class="cefr-bd-row"><span class="lbl" style="color:'+col+'">'+lv+'</span>'+
           '<div class="cefr-bd-bw"><div class="cefr-bd-b" style="width:'+pct+'%;background:'+col+'"></div></div>'+
-          '<span class="cefr-bd-pct">'+pct+'%</span>'+
-          '<span style="font-size:.68rem;color:var(--vm-ink-3);min-width:22px">'+count+'</span>'+
-        '</div>';
+          '<span class="cefr-bd-pct">'+pct+'%</span><span style="font-size:.68rem;color:var(--vm-ink-3);min-width:22px">'+count+'</span></div>';
       }).join('')+
-      '<div style="font-size:.7rem;color:var(--vm-ink-3);margin-top:6px">Total: '+bd.total+' từ</div>'+
-    '</div>';
+      '<div style="font-size:.7rem;color:var(--vm-ink-3);margin-top:6px">Total: '+bd.total+' words</div></div>';
   }
 
   function buildFilterBar(){
     if(!hasCEFR) return '';
-    var tk=VMCEFR.analyze(asgn.reading||'');
-    var bd=VMCEFR.breakdown(tk);
+    var tk=VMCEFR.analyze(asgn.reading||'');var bd=VMCEFR.breakdown(tk);
     var lvs=['A1','A2','B1','B2','C1','C2'];
     return '<div class="cefr-filterbar">'+
       '<span style="font-weight:700;color:var(--vm-ink-3);font-size:.76rem;flex:0 0 auto">CEFR:</span>'+
@@ -669,103 +677,95 @@ function openCEFRReader(asgn){
         return '<label data-flv="'+lv+'" style="opacity:'+(vis[lv]?1:.38)+'">'+
           '<input type="checkbox" data-lv="'+lv+'" style="display:none" '+(vis[lv]?'checked':'')+'>'+
           '<span class="cefr-dot" style="background:'+col+'"></span>'+
-          ' <span style="color:'+col+'">'+lv+'</span> <span class="cefr-count">'+(bd[lv]||0)+'</span>'+
-        '</label>';
+          ' <span style="color:'+col+'">'+lv+'</span> <span class="cefr-count">'+(bd[lv]||0)+'</span></label>';
       }).join('')+
       '<span class="cefr-sep">│</span>'+
       (gemKey
-        ? '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="aiBtnT" style="font-size:.75rem;padding:5px 9px">✨ AI Dịch</button>'+
-          '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="colBtnT" style="font-size:.75rem;padding:5px 9px">🔗 Collocations</button>'
-        : '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="keyBtnT" style="font-size:.75rem;padding:5px 9px">🔑 Gemini key</button>')+
+        ? '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="aiBtnR" style="font-size:.75rem;padding:5px 9px">✨ Translate</button>'+
+          '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="colBtnR" style="font-size:.75rem;padding:5px 9px">🔗 Collocations</button>'
+        : '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="keyBtnR" style="font-size:.75rem;padding:5px 9px">🔑 Add Gemini key</button>')+
     '</div>';
   }
 
   function render(){
     c.innerHTML=
-      '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="rwBack" style="margin-bottom:10px">← Back</button>'+
-      '<h2 style="font-family:var(--vm-font-display);font-size:1.15rem;margin:0 0 10px">'+VM.esc(asgn.title)+'</h2>'+
+      '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="rwBack2" style="margin-bottom:10px">← Back</button>'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px">'+
+        '<h2 style="font-family:var(--vm-font-display);font-size:1.15rem;margin:0">'+VM.esc(asgn.title)+'</h2>'+
+        '<button class="vm-btn vm-btn-primary" id="startRWQuiz" style="padding:9px 18px;font-size:.88rem">📝 Take Quiz</button>'+
+      '</div>'+
       buildFilterBar()+
       (!gemKey?
         '<div style="background:var(--vm-surface-2);border:1px solid var(--vm-border-2);border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:.8rem">'+
-          '<p style="margin:0 0 7px;font-weight:600;color:var(--vm-ink-2)">Nhập Gemini key để AI dịch & tìm collocations:</p>'+
-          '<div style="display:flex;gap:6px"><input id="keyIn" type="password" placeholder="AIza…" style="flex:1;border:1px solid var(--vm-border);border-radius:6px;padding:6px 8px;font-size:.8rem;background:var(--vm-surface)">'+
-          '<button id="keySave" style="background:var(--vm-primary);color:#fff;border:none;border-radius:6px;padding:6px 10px;font-size:.77rem;font-weight:600;cursor:pointer;white-space:nowrap">Lưu</button></div>'+
+          '<p style="margin:0 0 7px;font-weight:600;color:var(--vm-ink-2)">Add Gemini API key for AI translation &amp; collocations:</p>'+
+          '<div style="display:flex;gap:6px"><input id="rwKeyIn" type="password" placeholder="AIza…" style="flex:1;border:1px solid var(--vm-border);border-radius:6px;padding:6px 8px;font-size:.8rem;background:var(--vm-surface)">'+
+          '<button id="rwKeySave" style="background:var(--vm-primary);color:#fff;border:none;border-radius:6px;padding:6px 10px;font-size:.77rem;font-weight:600;cursor:pointer">Save</button></div>'+
         '</div>':'') +
       '<div class="cefr-shell">'+
-        '<div><div class="cefr-passage" id="cefrP">'+buildPassage()+'</div></div>'+
-        '<div class="cefr-right-panel" id="cefrRight">'+
+        '<div><div class="cefr-passage" id="rwPassage">'+buildPassage()+'</div></div>'+
+        '<div class="cefr-right-panel" id="rwRight">'+
           buildBD()+
-          '<div class="cefr-colloc" id="collocBox" style="display:none">'+
-            '<h4>🔗 Phrases &amp; Collocations</h4>'+
-            '<div id="collocList"></div>'+
+          '<div class="cefr-colloc" id="rwCollocBox" style="display:none">'+
+            '<h4>🔗 Phrases &amp; Collocations</h4><div id="rwCollocList"></div>'+
           '</div>'+
         '</div>'+
       '</div>';
 
-    // Back
-    document.getElementById('rwBack').onclick=function(){switchTab('reading');};
+    document.getElementById('rwBack2').onclick=function(){switchTab('reading');};
+    document.getElementById('startRWQuiz').onclick=function(){ openRWQuiz(asgn); };
 
     // Filter toggles
     VM.els('[data-lv]').forEach(function(inp){
       inp.closest('label').onclick=function(e){
         e.preventDefault();
-        var lv=inp.getAttribute('data-lv');
-        vis[lv]=!vis[lv];
+        var lv=inp.getAttribute('data-lv'); vis[lv]=!vis[lv];
         inp.closest('label').style.opacity=vis[lv]?'1':'.38';
-        document.getElementById('cefrP').innerHTML=buildPassage();
+        document.getElementById('rwPassage').innerHTML=buildPassage();
         bindPassClicks();
       };
     });
 
-    // AI translate
-    var aib=document.getElementById('aiBtnT');
+    var aib=document.getElementById('aiBtnR');
     if(aib) aib.onclick=function(){
-      aib.disabled=true; aib.textContent='⏳…';
+      aib.disabled=true;aib.textContent='⏳…';
       var toks=hasCEFR?VMCEFR.analyze(asgn.reading||''):[];
-      var words=[]; var seen={};
-      toks.forEach(function(t){ if(t.level&&!seen[t.clean.toLowerCase()]){seen[t.clean.toLowerCase()]=1;words.push(t.clean.toLowerCase());} });
+      var words=[],seen={};
+      toks.forEach(function(t){if(t.level&&!seen[t.clean.toLowerCase()]){seen[t.clean.toLowerCase()]=1;words.push(t.clean.toLowerCase());}});
       VMCEFR.fetchMeanings(words,gemKey,vocab).then(function(map){
         meanings=map;
-        document.getElementById('cefrP').innerHTML=buildPassage();
+        document.getElementById('rwPassage').innerHTML=buildPassage();
         bindPassClicks();
-        aib.disabled=false; aib.textContent='✨ AI Dịch';
-        VM.toast('Đã dịch '+Object.keys(map).length+' từ','ok');
+        aib.disabled=false;aib.textContent='✨ Translate';
+        VM.toast('Translated '+Object.keys(map).length+' words','ok');
       });
     };
 
-    // Collocations
-    var cb=document.getElementById('colBtnT');
+    var cb=document.getElementById('colBtnR');
     if(cb) cb.onclick=function(){
-      cb.disabled=true; cb.textContent='⏳…';
+      cb.disabled=true;cb.textContent='⏳…';
       VMCEFR.collocations(asgn.reading||'',gemKey).then(function(list){
-        collocs=list;
-        var box=document.getElementById('collocBox');
-        var el=document.getElementById('collocList');
+        var box=document.getElementById('rwCollocBox'),el=document.getElementById('rwCollocList');
         box.style.display='';
         el.innerHTML=list.map(function(i){
-          return '<div class="cefr-colloc-item">'+
-            '<div class="cefr-colloc-phrase">'+VM.esc(i.phrase)+'</div>'+
-            '<div class="cefr-colloc-vi">'+VM.esc(i.meaning)+'</div>'+
-          '</div>';
+          return '<div class="cefr-colloc-item"><div class="cefr-colloc-phrase">'+VM.esc(i.phrase)+'</div>'+
+            '<div class="cefr-colloc-vi">'+VM.esc(i.meaning)+'</div></div>';
         }).join('');
-        cb.disabled=false; cb.textContent='🔗 Collocations';
-        VM.toast(list.length+' cụm từ','ok');
+        cb.disabled=false;cb.textContent='🔗 Collocations';
+        VM.toast(list.length+' phrases found','ok');
       });
     };
 
-    // Key save
-    var ks=document.getElementById('keySave');
+    var ks=document.getElementById('rwKeySave');
     if(ks) ks.onclick=function(){
-      var v=(document.getElementById('keyIn').value||'').trim();
-      if(!v){VM.toast('Nhập key.','warn');return;}
-      VM.geminiKey.set(v); gemKey=v; render();
+      var v=(document.getElementById('rwKeyIn').value||'').trim();
+      if(!v){VM.toast('Enter key.','warn');return;}
+      VM.geminiKey.set(v);gemKey=v;render();
     };
 
-    // Mobile: toggle right panel button
-    var keyBtnT=document.getElementById('keyBtnT');
-    if(keyBtnT) keyBtnT.onclick=function(){
-      var box=document.getElementById('cefrRight');
-      if(box){box.style.display=box.style.display==='none'?'':'none';}
+    var kb=document.getElementById('keyBtnR');
+    if(kb) kb.onclick=function(){
+      var box=document.querySelector('.cefr-filterbar + div');
+      if(box) box.style.display=box.style.display==='none'?'':'none';
     };
 
     bindPassClicks();
@@ -774,7 +774,7 @@ function openCEFRReader(asgn){
   function bindPassClicks(){
     VM.els('.vm-cefr-word').forEach(function(span){
       span.onclick=function(){
-        showCEFRTip(span,span.getAttribute('data-word'),span.getAttribute('data-lemma'),span.getAttribute('data-level'),meanings[(span.getAttribute('data-word')||'').toLowerCase()]||null);
+        showCEFRTip(span,span.getAttribute('data-word'),span.getAttribute('data-level'),meanings[(span.getAttribute('data-word')||'').toLowerCase()]||null);
       };
     });
   }
@@ -782,21 +782,167 @@ function openCEFRReader(asgn){
   render();
 }
 
-// ── History ───────────────────────────────────────
+function openRWQuiz(asgn){
+  var vocab=asgn.vocab||[];
+  // Build comprehension questions from vocab (definition matching, up to RW_VOCAB_COUNT)
+  var shuffled=VM._shuffle(vocab.slice()).slice(0,RW_VOCAB_COUNT);
+  var quiz=VM.buildQuiz(shuffled,{mode:'choice',shuffle:true});
+
+  // Comprehension questions (content-based, up to RW_COMP_COUNT) from passage
+  // Simple: fill-in from examples in passage sentences
+  var compQ=buildCompQuestions(asgn.reading||'',asgn.vocab||[],RW_COMP_COUNT);
+
+  var allQ=quiz.questions.concat(compQ);
+  var c=document.getElementById('vmContent');
+  VM.setTitle('ReadWise Quiz — '+asgn.title);
+
+  var qIdx=0,correct=0,startTs=Date.now();
+
+  function renderRWQ(){
+    var q=allQ[qIdx],total=allQ.length,pct=Math.round(qIdx/total*100);
+    var isComp=q._comp;
+    c.innerHTML=
+      '<div class="vm-quiz-wrap">'+
+        '<div style="font-size:.78rem;color:var(--vm-ink-3);margin-bottom:8px">'+
+          (qIdx<quiz.questions.length?'📚 Vocabulary ('+(qIdx+1)+'/'+quiz.questions.length+')':'📖 Comprehension ('+(qIdx-quiz.questions.length+1)+'/'+compQ.length+')')+
+        '</div>'+
+        '<div class="vm-quiz-header">'+
+          '<div class="vm-quiz-progress">Question '+(qIdx+1)+'/'+total+
+            '<div class="vm-quiz-bar"><div class="vm-quiz-bar-fill" style="width:'+pct+'%"></div></div>'+
+          '</div>'+
+          '<span style="font-size:.8rem;color:var(--vm-ink-3)">✓ '+correct+'</span>'+
+        '</div>'+
+        '<div class="vm-quiz-card">'+
+          '<div class="vm-quiz-q">'+VM.esc(q.prompt)+'</div>'+
+          '<div class="vm-quiz-options">'+
+            q.options.map(function(opt){return '<button class="vm-opt" data-ans="'+VM.esc(opt)+'">'+VM.esc(opt)+'</button>';}).join('')+
+          '</div>'+
+          '<div class="vm-quiz-fb" id="rwFb"></div>'+
+          '<button class="vm-btn vm-btn-primary vm-quiz-submit" id="rwSubmit" disabled>Confirm</button>'+
+        '</div>'+
+      '</div>';
+
+    var answered=false,selected=null;
+    VM.els('[data-ans]').forEach(function(btn){
+      btn.onclick=function(){
+        if(answered) return;
+        selected=btn.getAttribute('data-ans');
+        VM.els('[data-ans]').forEach(function(b){b.classList.remove('selected');});
+        btn.classList.add('selected');
+        document.getElementById('rwSubmit').disabled=false;
+      };
+    });
+    document.getElementById('rwSubmit').onclick=function(){
+      if(answered||!selected) return;
+      answered=true;
+      var isCorrect=selected===q.answer;
+      if(isCorrect) correct++;
+      VM.els('[data-ans]').forEach(function(btn){
+        btn.disabled=true;btn.classList.remove('selected');
+        if(btn.getAttribute('data-ans')===q.answer) btn.classList.add('correct');
+        else if(btn.getAttribute('data-ans')===selected&&!isCorrect) btn.classList.add('wrong');
+      });
+      var fb=document.getElementById('rwFb');
+      if(fb){fb.className='vm-quiz-fb '+(isCorrect?'ok':'bad');fb.textContent=isCorrect?'✓ Correct!':'✗ Answer: '+q.answer;}
+      document.getElementById('rwSubmit').textContent='Submitted';
+      setTimeout(function(){qIdx++;if(qIdx>=allQ.length) showRWResult();else renderRWQ();},isCorrect?900:1800);
+    };
+  }
+
+  function showRWResult(){
+    var score=Math.round(correct/allQ.length*100);
+    var dur=Math.round((Date.now()-startTs)/1000);
+    showOverlay('Saving result…');
+    VM.api('result.save',{
+      studentId:sess.studentId,name:sess.name,class:sess.class,
+      assignmentId:asgn.assignmentId,title:asgn.title,mode:'readwise',
+      score:score,isPerfect:score===100,durationSec:dur,correct:correct,total:allQ.length
+    }).then(function(r){
+      hideOverlay();
+      if(r&&r.success) loadMyResults(function(){});
+      else VM.toast('Failed to save.','err');
+    }).catch(function(){hideOverlay();VM.toast('Connection error.','err');});
+
+    var sc=score>=90?'var(--vm-ok)':(score>=60?'#A66B00':'var(--vm-danger)');
+    c.innerHTML=
+      '<div class="vm-result-banner'+(score===100?' vm-perfect-anim':'')+'" style="margin-top:8px">'+
+        (score===100?'<div style="font-size:2.4rem;margin-bottom:6px">🎉</div>':'')+
+        '<div class="vm-result-score" style="color:'+sc+'">'+score+'%</div>'+
+        '<div class="vm-result-label">'+correct+'/'+allQ.length+' correct</div>'+
+        '<div class="vm-result-badges" style="margin-top:14px">'+
+          bdg(VM.fmtDuration(dur),'Duration')+
+          bdg(quiz.questions.length,'Vocab Qs')+
+          bdg(compQ.length,'Comprehension Qs')+
+        '</div>'+
+        '<div style="display:flex;gap:10px;justify-content:center;margin-top:18px;flex-wrap:wrap">'+
+          '<button class="vm-btn vm-btn-primary" id="rwAgain">Read Again</button>'+
+          '<button class="vm-btn vm-btn-ghost" id="rwDone">← Back</button>'+
+        '</div>'+
+      '</div>';
+    document.getElementById('rwAgain').onclick=function(){openRWArticle(asgn);};
+    document.getElementById('rwDone').onclick=function(){switchTab('reading');};
+  }
+
+  renderRWQ();
+}
+
+function buildCompQuestions(passage,vocab,count){
+  // Generate simple comprehension MCQs from the passage sentences
+  if(!passage) return [];
+  var sentences=passage.split(/[.!?]+/).map(function(s){return s.trim();}).filter(function(s){return s.split(/\s+/).length>=6;});
+  var qs=[];
+  var vocabSet={};
+  vocab.forEach(function(v){vocabSet[(v.word||'').toLowerCase()]=v;});
+
+  sentences.slice(0,count*2).forEach(function(sent){
+    if(qs.length>=count) return;
+    // Find a vocab word in the sentence to blank out
+    var words=sent.split(/\s+/);
+    var targetIdx=-1,targetWord=null;
+    for(var i=0;i<words.length;i++){
+      var w=words[i].toLowerCase().replace(/[^a-z]/g,'');
+      if(vocabSet[w]&&w.length>3){targetIdx=i;targetWord=w;break;}
+    }
+    if(targetIdx===-1) return;
+    var blanked=words.map(function(w,i){return i===targetIdx?'_____':w;}).join(' ');
+    var correct=words[targetIdx];
+    // Wrong options from other vocab words
+    var others=Object.keys(vocabSet).filter(function(k){return k!==targetWord;});
+    var wrong=VM._shuffle(others).slice(0,3).map(function(k){return vocabSet[k].word||k;});
+    qs.push({prompt:blanked,options:VM._shuffle([correct].concat(wrong)),answer:correct,_comp:true});
+  });
+
+  // If not enough, add definition-matching questions
+  var remaining=count-qs.length;
+  if(remaining>0&&vocab.length){
+    var extra=VM._shuffle(vocab.slice()).slice(0,remaining);
+    extra.forEach(function(v){
+      var others2=VM._shuffle(vocab.filter(function(x){return x.word!==v.word;})).slice(0,3);
+      var opts=VM._shuffle([v].concat(others2)).map(function(x){return x.word;});
+      qs.push({prompt:'Which word means: "'+( v.synonyms&&v.synonyms[0]?v.synonyms[0]:v.vi||v.meaningVi||v.word)+'"?',options:opts,answer:v.word,_comp:true});
+    });
+  }
+  return qs.slice(0,count);
+}
+
+/* ── History ──────────────────────────────────── */
 function renderHistory(){
+  showOverlay('Loading history…');
   loadMyResults(function(){
+    hideOverlay();
     var c=document.getElementById('vmContent');
-    if(!S.myResults.length){c.innerHTML='<div class="vm-empty"><p>Chưa có lịch sử.</p></div>';return;}
+    if(!S.myResults.length){c.innerHTML='<div class="vm-empty"><p>No history yet.</p></div>';return;}
     var rows=S.myResults.slice().sort(function(a,b){return new Date(b.timestamp)-new Date(a.timestamp);});
+    var modeIcon={homework:'📝',inclass:'🖥️',readwise:'📖'};
     c.innerHTML=
       '<div class="vm-table-wrap"><table class="vm-table"><thead><tr>'+
-        '<th>Thời gian</th><th>Bài</th><th>Điểm</th><th>Đúng</th><th>T.gian</th>'+
+        '<th>Time</th><th>Assignment</th><th>Mode</th><th>Score</th><th>Correct</th><th>Duration</th>'+
       '</tr></thead><tbody>'+
       rows.map(function(r){
         return '<tr>'+
-          '<td style="font-size:.78rem">'+VM.esc(VM.fmtDate(r.timestamp))+'</td>'+
-          '<td><b style="font-size:.82rem">'+VM.esc(r.title||r.assignmentId)+'</b>'+
-            '<br><span style="font-size:.72rem;color:var(--vm-ink-3)">'+(r.mode==='homework'?'📝':'🖥️')+' '+VM.esc(r.mode||'')+'</span></td>'+
+          '<td style="font-size:.76rem">'+VM.esc(VM.fmtDate(r.timestamp))+'</td>'+
+          '<td><b style="font-size:.82rem">'+VM.esc(r.title||r.assignmentId)+'</b></td>'+
+          '<td>'+(modeIcon[r.mode]||'')+'<span style="font-size:.76rem;color:var(--vm-ink-3);margin-left:3px">'+VM.esc(r.mode||'')+'</span></td>'+
           '<td class="vm-score '+scoreC(r.score)+'">'+r.score+'%'+(r.isPerfect?' ★':'')+'</td>'+
           '<td>'+r.correct+'/'+r.total+'</td>'+
           '<td>'+VM.fmtDuration(r.durationSec)+'</td>'+
@@ -807,7 +953,12 @@ function renderHistory(){
 }
 function scoreC(s){return s>=90?'vm-score-hi':(s>=60?'vm-score-mid':'vm-score-lo');}
 
-// ── Boot ──────────────────────────────────────────
+/* ── mode-chips CSS (inline since we can't edit theme now) ── */
+var mcs=document.createElement('style');
+mcs.textContent='.vm-mode-chip{padding:6px 14px;border:1.5px solid var(--vm-border);border-radius:var(--vm-r-pill);font-size:.82rem;font-weight:600;cursor:pointer;background:var(--vm-surface);color:var(--vm-ink-2);font-family:var(--vm-font-body);transition:all .14s}.vm-mode-chip.active{background:var(--vm-primary);color:#fff;border-color:var(--vm-primary)}';
+document.head.appendChild(mcs);
+
+/* ── Boot ─────────────────────────────────────── */
 switchTab('home');
 </script>
 </body>

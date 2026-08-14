@@ -24,9 +24,19 @@
 /* Result table badge */
 .vm-period-note{font-size:.78rem;color:var(--vm-ink-3);margin-left:auto;display:flex;align-items:center;gap:8px}
 .vm-btn-sm{padding:7px 14px;font-size:.82rem}
+/* Loading overlay */
+.vm-overlay{position:fixed;inset:0;background:rgba(13,79,58,.55);z-index:8888;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px}
+.vm-overlay.show{display:flex}
+.vm-overlay .vm-spin{width:38px;height:38px;border-width:4px}
+.vm-overlay p{color:#fff;font-size:.95rem;font-weight:600;margin:0}
 </style>
 </head>
 <body>
+<!-- Loading overlay -->
+<div class="vm-overlay" id="globalOverlay">
+  <span class="vm-spin"></span>
+  <p id="overlayMsg">Loading…</p>
+</div>
 <div id="app"></div>
 
 <!-- Create/Edit Assignment Modal -->
@@ -174,10 +184,17 @@ var sess = VM.session.require('teacher');
 if (!sess) throw new Error('not teacher');
 
 // ── State ───────────────────────────────────────────────────────
+/*── Loading overlay ──*/
+function showOverlay(msg){
+  document.getElementById('overlayMsg').textContent=msg||'Loading…';
+  document.getElementById('globalOverlay').classList.add('show');
+}
+function hideOverlay(){ document.getElementById('globalOverlay').classList.remove('show'); }
+
 var state = {
   classes: [],
-  assignments: [],    // all assignments for teacher's classes
-  results: [],        // loaded results
+  assignments: [],
+  results: [],
   resultsFull: false,
   activeTab: 'overview',
   filterClass: '',
@@ -214,6 +231,7 @@ function switchTab(id) {
   VM.setTitle(titles[id] || id);
   var content = document.getElementById('vmContent');
   content.innerHTML = '<div class="vm-empty"><span class="vm-spin-dark" style="width:24px;height:24px;border-width:3px"></span></div>';
+  showOverlay('Loading…');
   if (id === 'overview') renderOverview();
   else if (id === 'classes')  renderClasses();
   else if (id === 'assign')   renderAssignments();
@@ -251,6 +269,7 @@ function renderOverview() {
   loadClasses(function() {
     loadAssignments(function() {
       loadResults(false, function() {
+        hideOverlay();
         var content = document.getElementById('vmContent');
         var totalStu = 0; // estimate from results
         var stuSet = {};
@@ -312,6 +331,7 @@ function scoreClass(s){ return s>=90?'vm-score-hi':(s>=60?'vm-score-mid':'vm-sco
 // ── Classes tab ───────────────────────────────────────────────────
 function renderClasses() {
   loadClasses(function() {
+    hideOverlay();
     var content = document.getElementById('vmContent');
     var html =
       '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">' +
@@ -393,16 +413,36 @@ function openRoster(classId) {
       '</tr></thead><tbody>' +
       res.data.map(function(s){
         return '<tr><td>'+VM.esc(s.studentId)+'</td><td>'+VM.esc(s.name)+'</td>' +
+               '<td>'+VM.esc(s.class||'—')+'</td>'+
                '<td>'+VM.esc(s.email||'—')+'</td>' +
-               '<td><button class="vm-btn vm-btn-ghost vm-btn-sm" data-rmstu="'+VM.esc(s.studentId)+'">Remove</button></td></tr>';
+               '<td style="white-space:nowrap">'+
+               '<button class="vm-btn vm-btn-ghost vm-btn-sm" style="margin-right:4px" data-editstu="'+VM.esc(s.studentId)+'|'+VM.esc(s.name)+'|'+VM.esc(s.class||'')+'|'+VM.esc(s.email||'')+'">Edit</button>'+
+               '<button class="vm-btn vm-btn-danger vm-btn-sm" data-rmstu="'+VM.esc(s.studentId)+'">Remove</button></td></tr>';
       }).join('') + '</tbody></table></div>';
+    VM.els('[data-editstu]').forEach(function(btn){
+      btn.onclick = function(){
+        var parts = btn.getAttribute('data-editstu').split('|');
+        var sid=parts[0], sname=parts[1], scls=parts[2], semail=parts[3];
+        var newName = prompt('Name:', sname); if(newName===null) return;
+        var newClass = prompt('Class ID:', scls); if(newClass===null) return;
+        var newEmail = prompt('Email:', semail); if(newEmail===null) return;
+        showOverlay('Updating student…');
+        VM.api('student.update',{studentId:sid, name:newName.trim(), class:newClass.trim().toUpperCase(), email:newEmail.trim()}).then(function(r){
+          hideOverlay();
+          if(r&&r.success){VM.toast('Updated.','ok');openRoster(classId);}
+          else VM.toast('Error: '+(r&&r.error),'err');
+        }).catch(function(){hideOverlay();VM.toast('Connection error.','err');});
+      };
+    });
     VM.els('[data-rmstu]').forEach(function(btn){
       btn.onclick = function(){
         if(!confirm('Remove student '+btn.getAttribute('data-rmstu')+' from the system?')) return;
+        showOverlay('Removing student…');
         VM.api('student.archive',{studentId:btn.getAttribute('data-rmstu')}).then(function(r){
+          hideOverlay();
           if(r&&r.success){VM.toast('Removed.','ok');openRoster(classId);}
           else VM.toast('Error.','err');
-        });
+        }).catch(function(){hideOverlay();VM.toast('Connection error.','err');});
       };
     });
   });
@@ -413,6 +453,7 @@ document.getElementById('rosterClose').onclick = function(){ document.getElement
 function renderAssignments() {
   loadClasses(function(){
     loadAssignments(function(){
+      hideOverlay();
       var content = document.getElementById('vmContent');
       var html =
         '<div class="vm-toolbar">' +
@@ -668,6 +709,7 @@ document.getElementById('assignSave').onclick = function(){
   if (state.editingAssignId) payload.assignmentId = state.editingAssignId;
 
   document.getElementById('assignSave').disabled = true;
+  showOverlay('Saving assignment…');
   VM.api(action, payload).then(function(res){
     document.getElementById('assignSave').disabled = false;
     if(res&&res.success){
@@ -690,6 +732,7 @@ function renderResults(full) {
 }
 
 function _renderResultsUI() {
+  hideOverlay();
   var content = document.getElementById('vmContent');
   var assignments = state.assignments;
 

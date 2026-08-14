@@ -8,7 +8,7 @@
 
   // ── CONFIG ─────────────────────────────────────
   // Replace with your deployed GAS /exec URL
-  var GAS = 'https://script.google.com/macros/s/AKfycbwe50uEyLe_oi__V_3eJ6JMfmbTqBbwR7u1md0JIGTGrILLOWoYSBCbqraXDltClqaf/exec';
+  var GAS = 'https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec';
 
   var VM = {
     GAS: GAS,
@@ -514,37 +514,68 @@
         return p.word + (p.hint ? ' = ' + p.hint : '');
       }).join('\n');
 
+    var BATCH = 20;
+    var GAS_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=';
     if (onProgress) onProgress(0, parsed.length);
 
-    return fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' +
-      encodeURIComponent(apiKey),
-      {
+    function callGemini(batch) {
+      var batchPrompt =
+        'You are a vocabulary assistant for Vietnamese EFL learners. ' +
+        'For each word, provide: IPA pronunciation (accurate), ' +
+        'English synonyms (up to 3, comma-separated), ' +
+        'concise Vietnamese translation (≤6 words). ' +
+        'If a hint is given after "=", use it as the primary synonym. ' +
+        'Return ONLY a JSON array, NO markdown, NO extra text:\n' +
+        '[{"word":"...","ipa":"...","synonyms":"...","vi":"..."}]\n\n' +
+        'Words:\n' + batch.map(function(p){ return p.word + (p.hint ? ' = ' + p.hint : ''); }).join('\n');
+
+      return fetch(GAS_URL + encodeURIComponent(apiKey), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.2, maxOutputTokens: 4096 }
+          contents: [{ parts: [{ text: batchPrompt }] }],
+          generationConfig: { temperature: 0.1, maxOutputTokens: 2048 }
         })
-      }
-    ).then(function (r) {
-      if (!r.ok) return r.text().then(function (t) { throw new Error('Gemini ' + r.status + ': ' + t.slice(0,200)); });
-      return r.json();
-    }).then(function (d) {
-      var text = ((((d.candidates||[])[0]||{}).content||{}).parts||[]).map(function(p){return p.text||'';}).join('');
-      // Strip markdown fences
-      text = text.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
-      var arr = JSON.parse(text);
-      if (onProgress) onProgress(arr.length, arr.length);
-      // Merge back: keep original word casing, add hint-based synonyms
-      return arr.map(function (item, i) {
-        var orig = parsed[i] || {};
-        var syns = String(item.synonyms||'').split(',').map(function(s){return s.trim();}).filter(Boolean);
-        if (orig.hint && syns.indexOf(orig.hint) === -1) syns.unshift(orig.hint);
-        return { word: orig.word || item.word, ipa: item.ipa||'', synonyms: syns, vi: item.vi||'',
-                 meaningVi: item.vi||'' };
+      }).then(function(r){
+        if (!r.ok) return r.text().then(function(t){ throw new Error('Gemini ' + r.status + ': ' + t.slice(0,200)); });
+        return r.json();
+      }).then(function(d){
+        var text = ((((d.candidates||[])[0]||{}).content||{}).parts||[]).map(function(p){return p.text||'';}).join('');
+        text = text.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+        // Auto-close truncated JSON
+        var open = (text.match(/\[/g)||[]).length - (text.match(/\]/g)||[]).length;
+        if (open > 0) text += ']';
+        return JSON.parse(text);
       });
-    });
+    }
+
+    // Split into batches of 20, call sequentially
+    var batches = [];
+    for (var b = 0; b < parsed.length; b += BATCH) {
+      batches.push(parsed.slice(b, b + BATCH));
+    }
+
+    var allResults = [];
+    function runBatch(idx) {
+      if (idx >= batches.length) {
+        // Merge results with original parsed order
+        return Promise.resolve(allResults.map(function(item, i) {
+          var orig = parsed[i] || {};
+          var syns = String(item.synonyms||'').split(',').map(function(s){return s.trim();}).filter(Boolean);
+          if (orig.hint && syns.indexOf(orig.hint) === -1) syns.unshift(orig.hint);
+          return { word: orig.word || item.word, ipa: item.ipa||'', synonyms: syns,
+                   vi: item.vi||'', meaningVi: item.vi||'' };
+        }));
+      }
+      return callGemini(batches[idx]).then(function(arr){
+        allResults = allResults.concat(arr);
+        if (onProgress) onProgress(allResults.length, parsed.length);
+        // 500ms pause between batches to avoid rate limiting
+        return new Promise(function(res){ setTimeout(res, 500); }).then(function(){ return runBatch(idx + 1); });
+      });
+    }
+
+    return runBatch(0);
   };
 
   global.VM = VM;
