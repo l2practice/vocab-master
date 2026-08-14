@@ -274,231 +274,231 @@ function bindCards(){
 }
 
 /* ── Review (6-min mandatory read) ──────────── */
-var _reviewTimer=null;
-function openReview(asgn){
-  var c=document.getElementById('vmContent');
-  VM.setTitle(asgn.title);
-  var res=myResultsFor(asgn.assignmentId);
-  var hasPerfect=res.filter(function(r){return r.isPerfect;}).length>0;
-  var REVIEW_SEC=360;
-  var remaining=REVIEW_SEC;
-  var vocab=asgn.vocab||[];
-  var passage=asgn.reading||'';
+/* ── Pretest modal (full-screen, vocab master style) ── */
+function showPretestModal(asgn, onStart) {
+  // Create full-screen overlay like vocab master's pretest-shell
+  var old = document.getElementById('vmPretestModal');
+  if (old) old.remove();
 
-  var passageHtml;
-  if(hasCEFR&&passage){
-    var meanings={};
-    vocab.forEach(function(v){ if(v.vi||v.meaningVi) meanings[(v.word||'').toLowerCase()]={vi:v.vi||v.meaningVi||'',ipa:v.ipa||''}; });
-    passageHtml=VMCEFR.renderPassage(passage,{
-      visibleLevels:{A1:false,A2:false,B1:true,B2:true,C1:true,C2:true},
-      meanings:meanings, vocabHighlight:vocab.map(function(v){return v.word;})
-    });
-  } else {
-    passageHtml=passage?VM.esc(passage).replace(/\n/g,'<br>'):'<em style="color:var(--vm-ink-3)">No reading passage.</em>';
-  }
+  var hasPerfect = myResultsFor(asgn.assignmentId).filter(function(r){return r.isPerfect;}).length > 0;
+  var SECS = 360; // 6 minutes
+  var vocab = asgn.vocab || [];
+  var passage = asgn.reading || '';
+  var passHtml = passage
+    ? passage.split(/\n{2,}|\n/).filter(function(p){return p.trim();})
+        .map(function(p){return '<p style="margin:0 0 14px;line-height:1.78">'+VM.esc(p.trim())+'</p>';}).join('')
+    : '<em style="color:rgba(255,255,255,.4)">No reading passage provided.</em>';
 
-  var vocabHtml=vocab.map(function(v){
-    var lemma=hasCEFR?VMCEFR.lemmatize((v.word||'').toLowerCase()):null;
-    var entry=lemma&&typeof CEFR_MAP!=='undefined'?CEFR_MAP[lemma]:null;
-    var lvInfo=entry?entry.split('|')[0]:null;
-    var lvNum=lvInfo?lvInfo[0]:null;
-    var lvName=lvNum&&VMCEFR?VMCEFR.LEVEL_NAME[lvNum]:null;
-    var lvCol=lvNum?LC[lvNum]:'#999';
-    var syns=(v.synonyms||[]).slice(0,3).join(', ');
-    return '<div class="rv-card">'+
-      '<div class="rv-word">'+VM.esc(v.word||'')+
-        (lvName?'<span class="rv-badge" style="background:'+lvCol+'">'+lvName+'</span>':'')+
-      '</div>'+
-      (v.ipa?'<div class="rv-ipa">/'+VM.esc(v.ipa)+'/</div>':'')+
-      (syns?'<div class="rv-syns">'+VM.esc(syns)+'</div>':'')+
-      ((v.vi||v.meaningVi)?'<div class="rv-vi">'+VM.esc(v.vi||v.meaningVi)+'</div>':'')+
-    '</div>';
+  var vocabRows = vocab.map(function(v){
+    return '<tr>'+
+      '<td style="font-weight:700;padding:8px 12px">'+VM.esc(v.word||'')+'</td>'+
+      '<td style="font-family:monospace;font-size:11px;padding:8px 12px;color:#9CA3AF">'+VM.esc(v.ipa||'—')+'</td>'+
+      '<td style="padding:8px 12px;color:#D1D5DB">'+VM.esc((v.synonyms&&v.synonyms.length?v.synonyms[0]:'')||v.syn||'—')+'</td>'+
+      '<td style="padding:8px 12px;color:#6EE7B7">'+VM.esc(v.vi||v.meaningVi||'—')+'</td>'+
+    '</tr>';
   }).join('');
 
-  c.innerHTML=
-    '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="rvBack" style="margin-bottom:12px">← Back</button>'+
-    '<div class="timer-info">'+
-      '<span id="rvLabel">📖 Read & review vocabulary before the quiz</span>'+
-      '<span id="rvTime" style="font-size:1rem;font-family:var(--vm-font-display)">6:00</span>'+
-    '</div>'+
-    '<div class="timer-bar-wrap"><div class="timer-bar-fill" id="rvBar" style="width:100%"></div></div>'+
-    '<div class="review-shell">'+
-      '<div class="review-passage-col">'+
-        '<div class="review-passage-body" id="rvPassage">'+
-          '<h3 style="font-family:var(--vm-font-display);font-size:1rem;margin:0 0 12px;color:var(--vm-primary-dk)">📖 '+VM.esc(asgn.title)+'</h3>'+
-          (passage?passageHtml:'<em style="color:var(--vm-ink-3)">No reading passage for this assignment.</em>')+
-        '</div>'+
+  var el = document.createElement('div');
+  el.id = 'vmPretestModal';
+  el.style.cssText = 'position:fixed;inset:0;z-index:9000;background:#fff;display:flex;flex-direction:column;overflow:hidden';
+  el.innerHTML =
+    // Dark topbar
+    '<div id="ptTopbar" style="background:#111827;color:#fff;padding:10px 20px;display:flex;align-items:center;gap:16px;flex-shrink:0;border-bottom:2px solid #F59E0B">'+
+      '<div style="text-align:center;min-width:60px">'+
+        '<div style="font-size:10px;font-weight:700;color:rgba(255,255,255,.4);letter-spacing:.08em;text-transform:uppercase">Remaining</div>'+
+        '<div id="ptTimer" style="font-family:monospace;font-size:1.6rem;font-weight:700;color:#fff;line-height:1">6:00</div>'+
       '</div>'+
-      '<div class="review-vocab-col">'+
-        '<div style="font-size:.72rem;font-weight:700;color:var(--vm-ink-3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Target Words</div>'+
-        (vocabHtml||'<div style="color:var(--vm-ink-3);font-size:.82rem">No vocabulary.</div>')+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="font-weight:700;font-size:1rem;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+VM.esc(asgn.title)+'</div>'+
+        '<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:2px">Study the passage and vocabulary carefully before starting</div>'+
       '</div>'+
+      '<button id="ptStart" disabled style="white-space:nowrap;min-width:180px;background:#F59E0B;color:#111;border:none;border-radius:8px;padding:10px 18px;font-weight:700;font-size:.88rem;cursor:pointer;font-family:inherit">'+
+        '🔒 Unlocks in <span id="ptCountdown">6:00</span>'+
+      '</button>'+
+      (hasPerfect?'<button id="ptSkip" style="white-space:nowrap;background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.3);color:#fff;padding:9px 14px;border-radius:8px;font-family:inherit;font-weight:600;font-size:.82rem;cursor:pointer">⚡ Skip</button>':'')+ 
+      '<button id="ptClose" style="background:rgba(255,255,255,.08);border:none;color:rgba(255,255,255,.5);width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:16px;flex-shrink:0">✕</button>'+
     '</div>'+
-    '<div style="text-align:center;margin-top:16px">'+
-      '<button class="vm-btn vm-btn-primary" id="rvStart" style="padding:13px 32px;font-size:1rem" disabled>⏳ Please wait…</button>'+
-      (hasPerfect?'<br><button class="vm-btn vm-btn-ghost vm-btn-sm" id="rvSkip" style="margin-top:8px">Skip review (already scored 100%)</button>':'')+
+    // Body: passage left, vocab right
+    '<div style="flex:1;display:flex;overflow:hidden">'+
+      '<div style="flex:1.2;overflow-y:auto;padding:22px 26px;border-right:1px solid #E5E7EB">'+
+        '<div style="font-family:var(--vm-font-display);font-size:1.05rem;font-weight:700;color:#111827;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid #EF4444">📖 Reading Passage</div>'+
+        '<div style="font-size:.95rem;color:#374151">'+passHtml+'</div>'+
+      '</div>'+
+      '<div style="flex:1;overflow-y:auto;padding:22px 20px;background:#F9FAFB">'+
+        '<div style="font-family:var(--vm-font-display);font-size:1.05rem;font-weight:700;color:#111827;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid #EF4444">📚 Vocabulary to Study</div>'+
+        '<div style="overflow-x:auto">'+
+        '<table style="width:100%;border-collapse:collapse;font-size:.85rem">'+
+          '<thead><tr style="background:#F3F4F6">'+
+            '<th style="text-align:left;padding:8px 12px;font-size:.73rem;color:#6B7280;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Word</th>'+
+            '<th style="text-align:left;padding:8px 12px;font-size:.73rem;color:#6B7280;font-weight:700;text-transform:uppercase;letter-spacing:.05em">IPA</th>'+
+            '<th style="text-align:left;padding:8px 12px;font-size:.73rem;color:#6B7280;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Synonym / Definition</th>'+
+            '<th style="text-align:left;padding:8px 12px;font-size:.73rem;color:#6B7280;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Vietnamese</th>'+
+          '</tr></thead>'+
+          '<tbody>'+vocabRows+'</tbody>'+
+        '</table></div>'+
+      '</div>'+
     '</div>';
 
-  document.getElementById('rvBack').onclick=function(){ clearReviewTimer(); switchTab(S.activeTab); };
-  if(hasPerfect) document.getElementById('rvSkip').onclick=function(){ clearReviewTimer(); openQuizDirect(asgn); };
+  document.body.appendChild(el);
 
-  if(hasCEFR){
-    setTimeout(function(){
-      var m2={};
-      vocab.forEach(function(v){ m2[(v.word||'').toLowerCase()]={vi:v.vi||v.meaningVi||'',ipa:v.ipa||''}; });
-      VM.els('.vm-cefr-word').forEach(function(span){
-        span.onclick=function(){ showCEFRTip(span,span.getAttribute('data-word'),span.getAttribute('data-level'),m2[span.getAttribute('data-word').toLowerCase()]||null); };
-      });
-    },100);
-  }
-
-  if(_reviewTimer) clearInterval(_reviewTimer);
-  _reviewTimer=setInterval(function(){
+  // Timer
+  var remaining = SECS;
+  var interval = setInterval(function(){
     remaining--;
-    var bar=document.getElementById('rvBar');
-    var timeEl=document.getElementById('rvTime');
-    var startBtn=document.getElementById('rvStart');
-    if(!bar){clearInterval(_reviewTimer);return;}
-    var pct=Math.round(remaining/REVIEW_SEC*100);
-    bar.style.width=pct+'%';
-    if(remaining<=60) bar.classList.add('warn');
-    var m=Math.floor(remaining/60),s=remaining%60;
-    if(timeEl) timeEl.textContent=m+':'+(s<10?'0':'')+s;
+    var m=Math.floor(remaining/60),s2=remaining%60;
+    var fmt=m+':'+(s2<10?'0':'')+s2;
+    var td=document.getElementById('ptTimer');
+    var cd=document.getElementById('ptCountdown');
+    if(td) td.textContent=fmt;
+    if(cd) cd.textContent=fmt;
+    if(td && remaining<=60) td.style.color='#F87171';
     if(remaining<=0){
-      clearInterval(_reviewTimer);
-      if(startBtn){startBtn.disabled=false;startBtn.textContent='▶ Start Quiz';}
-      if(timeEl) timeEl.textContent='';
-      var lbl=document.getElementById('rvLabel');
-      if(lbl) lbl.textContent='✅ Ready to start!';
-    } else {
-      if(startBtn) startBtn.textContent='⏳ '+remaining+'s remaining…';
+      clearInterval(interval);
+      var btn=document.getElementById('ptStart');
+      if(btn){btn.disabled=false;btn.innerHTML='🚀 Start Quiz Now!';btn.style.background='#10B981';}
+      if(td) td.textContent='Ready!';
     }
   },1000);
 
-  document.getElementById('rvStart').onclick=function(){ clearReviewTimer(); openQuizDirect(asgn); };
+  function close(){ clearInterval(interval); el.remove(); }
+
+  document.getElementById('ptClose').onclick=function(){ close(); switchTab(S.activeTab); };
+  document.getElementById('ptStart').onclick=function(){ close(); onStart(); };
+  if(hasPerfect){
+    document.getElementById('ptSkip').onclick=function(){ close(); onStart(); };
+  }
 }
+
+var _reviewTimer=null;
 function clearReviewTimer(){ if(_reviewTimer){clearInterval(_reviewTimer);_reviewTimer=null;} }
 
-/* ── Quiz ─────────────────────────────────────── */
+function openReview(asgn){
+  showPretestModal(asgn, function(){ openQuizDirect(asgn); });
+}
+
 function openQuizDirect(asgn){
   clearReviewTimer();
   var c=document.getElementById('vmContent');
   VM.setTitle(asgn.title);
-  var modes=[{id:'choice',label:'✦ MCQ'},{id:'blank',label:'✍ Fill Blank'},{id:'spell',label:'🔤 Spell'}];
+  // No mode selector — always random mixed
   c.innerHTML=
     '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="qBack" style="margin-bottom:12px">← Back</button>'+
-    '<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">'+
-      modes.map(function(m){return '<button class="vm-mode-chip'+(m.id==='choice'?' active':'')+'" data-qmode="'+m.id+'">'+m.label+'</button>';}).join('')+
-    '</div><div id="quizArea"></div>';
+    '<div id="quizArea"></div>';
   document.getElementById('qBack').onclick=function(){ S.quiz=null; switchTab(S.activeTab); };
-  var curMode='choice';
-  VM.els('[data-qmode]').forEach(function(btn){
-    btn.onclick=function(){
-      curMode=btn.getAttribute('data-qmode');
-      VM.els('[data-qmode]').forEach(function(b){b.classList.toggle('active',b===btn);});
-      startQuiz(asgn,curMode);
-    };
-  });
-  startQuiz(asgn,'choice');
+  startQuiz(asgn);
 }
 
-function startQuiz(asgn,mode){
+function startQuiz(asgn){
   var vocab=asgn.vocab||[];
   if(!vocab.length){document.getElementById('quizArea').innerHTML='<div class="vm-empty"><p>No vocabulary in this assignment.</p></div>';return;}
-  S.quiz=VM.buildQuiz(vocab,{mode:mode,shuffle:true});
-  S.quizState={asgn:asgn,qIdx:0,correct:0,startTs:Date.now(),quizMode:mode};
+  S.quiz=VM.buildQuiz(vocab,{isReview:asgn.mode==='inclass',total:65});
+  S.quizState={asgn:asgn,qIdx:0,correct:0,startTs:Date.now()};
   renderQ();
 }
 
 function renderQ(){
-  var qs=S.quizState,q=S.quiz.questions[qs.qIdx],total=S.quiz.questions.length;
+  var qs=S.quizState,q=S.quiz.questions[qs.qIdx],total=S.quiz.total;
+  if(!q){showResult();return;}
   var pct=Math.round(qs.qIdx/total*100);
-  var isChoice=S.quiz.mode==='choice'||S.quiz.mode==='match';
+  var isFITB=q.type==='fitb';
   document.getElementById('quizArea').innerHTML=
     '<div class="vm-quiz-wrap">'+
-      '<div class="vm-quiz-header">'+
-        '<div class="vm-quiz-progress">Question '+(qs.qIdx+1)+'/'+total+
-          '<div class="vm-quiz-bar"><div class="vm-quiz-bar-fill" style="width:'+pct+'%"></div></div>'+
+      '<div class="vm-quiz-header" style="margin-bottom:12px">'+
+        '<div class="vm-quiz-progress">'+
+          '<span style="font-size:.8rem;color:var(--vm-ink-3)">'+q.label+'</span>'+
+          ' · Q '+(qs.qIdx+1)+'/'+total+
+          '<div class="vm-quiz-bar" style="width:140px;margin-left:8px"><div class="vm-quiz-bar-fill" style="width:'+pct+'%"></div></div>'+
         '</div>'+
         '<span style="font-size:.8rem;color:var(--vm-ink-3)">✓ '+qs.correct+'</span>'+
       '</div>'+
       '<div class="vm-quiz-card">'+
+        (q.ipa?'<div style="font-family:monospace;font-size:.85rem;color:var(--vm-ink-3);margin-bottom:6px">/'+VM.esc(q.ipa)+'/</div>':'')+
         '<div class="vm-quiz-q">'+VM.esc(q.prompt)+'</div>'+
-        (q.subprompt&&q.subprompt!==q.prompt?'<div class="vm-quiz-hint">'+VM.esc(q.subprompt)+'</div>':'')+
-        (q.hint?'<div class="vm-quiz-hint">'+VM.esc(q.hint)+'</div>':'')+
-        buildInput(q,isChoice)+
+        (isFITB?renderFITB(q):renderMC(q))+
       '</div>'+
     '</div>';
-  bindInput(q,isChoice);
+  bindQuizInput(q,isFITB);
 }
 
-function buildInput(q,isChoice){
-  if(isChoice)
-    return '<div class="vm-quiz-options">'+
-      q.options.map(function(opt){return '<button class="vm-opt" data-ans="'+VM.esc(opt)+'">'+VM.esc(opt)+'</button>';}).join('')+
-    '</div><div class="vm-quiz-fb" id="qFb"></div>'+
-    '<button class="vm-btn vm-btn-primary vm-quiz-submit" id="qSubmit" disabled>Confirm</button>';
-  return '<input class="vm-quiz-input" id="qInput" placeholder="Type your answer…" autocomplete="off" spellcheck="false">'+
+function renderMC(q){
+  return '<div class="vm-quiz-options">'+
+    q.choices.map(function(ch){
+      return '<button class="vm-opt" data-ans="'+VM.esc(ch)+'">'+VM.esc(ch)+'</button>';
+    }).join('')+
+  '</div>'+
+  '<div class="vm-quiz-fb" id="qFb"></div>'+
+  '<button class="vm-btn vm-btn-primary vm-quiz-submit" id="qSubmit" disabled style="margin-top:12px">Confirm</button>';
+}
+
+function renderFITB(q){
+  return '<div style="background:linear-gradient(135deg,#EFF6FF,#E0EFFE);border-radius:10px;border:1.5px solid #BFDBFE;padding:14px 18px;margin-bottom:14px;font-size:1rem;line-height:1.8">'+
+      q.sentence.replace('_______','<span style="display:inline-block;min-width:90px;border-bottom:2px solid #1B7F5E;padding:0 6px;font-weight:700;color:var(--vm-primary);font-family:monospace">_______</span>')+
+    '</div>'+
+    '<div style="font-size:.78rem;color:var(--vm-ink-3);margin-bottom:10px;text-align:center">First letter: <b style="font-family:monospace;font-size:1rem">'+q.firstLetter+'</b> · '+q.wordLen+' letters</div>'+
+    '<input class="vm-quiz-input" id="qFitbInput" placeholder="Type the word…" autocomplete="off" spellcheck="false" maxlength="'+(q.wordLen+5)+'">'+
     '<div class="vm-quiz-fb" id="qFb"></div>'+
     '<button class="vm-btn vm-btn-primary vm-quiz-submit" id="qSubmit" style="margin-top:12px" disabled>Confirm</button>';
 }
 
-function bindInput(q,isChoice){
-  var answered=false,selected=null;
+function bindQuizInput(q,isFITB){
+  var answered=false, selected=null;
   function confirm(){
     if(answered) return;
-    if(isChoice&&!selected) return;
-    if(!isChoice){var inp=document.getElementById('qInput');if(!inp||!inp.value.trim()) return;selected=inp.value.trim();}
+    if(!isFITB && !selected) return;
+    if(isFITB){
+      var inp=document.getElementById('qFitbInput');
+      if(!inp||!inp.value.trim()) return;
+      selected=inp.value.trim();
+    }
     answered=true;
     var res=S.quiz.check(S.quizState.qIdx,selected);
-    var fb=document.getElementById('qFb'),sub=document.getElementById('qSubmit');
+    var fb=document.getElementById('qFb');
+    var sub=document.getElementById('qSubmit');
     if(sub){sub.disabled=true;sub.textContent='Submitted';}
-    if(isChoice){
+    if(!isFITB){
       VM.els('[data-ans]').forEach(function(btn){
         btn.disabled=true;btn.classList.remove('selected');
-        if(btn.getAttribute('data-ans')===q.answer) btn.classList.add('correct');
+        if(btn.getAttribute('data-ans')===q.correct) btn.classList.add('correct');
         else if(btn.getAttribute('data-ans')===selected&&!res.correct) btn.classList.add('wrong');
       });
     } else {
-      var inp2=document.getElementById('qInput');
+      var inp2=document.getElementById('qFitbInput');
       if(inp2){inp2.disabled=true;inp2.classList.add(res.correct?'correct':'wrong');}
     }
-    if(fb){fb.className='vm-quiz-fb '+(res.correct?'ok':'bad');fb.textContent=res.correct?'✓ Correct!':'✗ Answer: '+res.correctAnswer;}
+    if(fb){fb.className='vm-quiz-fb '+(res.correct?'ok':'bad');
+           fb.textContent=res.correct?'✓ Correct!':'✗ Answer: '+q.correct;}
     if(res.correct) S.quizState.correct++;
     setTimeout(function(){
       S.quizState.qIdx++;
-      if(S.quizState.qIdx>=S.quiz.questions.length) showResult();
+      if(S.quizState.qIdx>=S.quiz.total) showResult();
       else renderQ();
     },res.correct?900:1800);
   }
-  if(isChoice){
+  if(!isFITB){
     VM.els('[data-ans]').forEach(function(btn){
       btn.onclick=function(){
         if(answered) return;
         selected=btn.getAttribute('data-ans');
         VM.els('[data-ans]').forEach(function(b){b.classList.remove('selected');});
         btn.classList.add('selected');
-        var sub=document.getElementById('qSubmit');
-        if(sub) sub.disabled=false;
+        var sub=document.getElementById('qSubmit');if(sub)sub.disabled=false;
       };
     });
-    var sub=document.getElementById('qSubmit');
-    if(sub) sub.onclick=confirm;
+    var sub=document.getElementById('qSubmit');if(sub)sub.onclick=confirm;
   } else {
-    var inp=document.getElementById('qInput'),sub2=document.getElementById('qSubmit');
+    var inp=document.getElementById('qFitbInput'),sub2=document.getElementById('qSubmit');
     if(inp){
       inp.focus();
-      inp.oninput=function(){if(sub2) sub2.disabled=!inp.value.trim();};
-      inp.onkeydown=function(e){if(e.key==='Enter'&&sub2&&!sub2.disabled) confirm();};
+      inp.oninput=function(){if(sub2)sub2.disabled=!inp.value.trim();};
+      inp.onkeydown=function(e){if(e.key==='Enter'&&sub2&&!sub2.disabled)confirm();};
     }
-    if(sub2){sub2.onclick=confirm;}
+    if(sub2) sub2.onclick=confirm;
   }
 }
 
 function showResult(){
-  var qs=S.quizState,total=S.quiz.questions.length;
-  var score=Math.round(qs.correct/total*100),isPerfect=score===100;
-  var dur=Math.round((Date.now()-qs.startTs)/1000);
+  var qs=S.quizState,total=S.quiz.total;
+  var score=Math.round(qs.correct/total*100),isPerfect=score===100,dur=Math.round((Date.now()-qs.startTs)/1000);
   var asgn=qs.asgn;
   showOverlay('Saving result…');
   VM.api('result.save',{
@@ -509,12 +509,11 @@ function showResult(){
     hideOverlay();
     if(r&&r.success) loadMyResults(function(){});
     else VM.toast('Failed to save result.','err');
-  }).catch(function(){ hideOverlay(); VM.toast('Connection error.','err'); });
+  }).catch(function(){hideOverlay();VM.toast('Connection error.','err');});
 
   var lr=S.myResults.filter(function(r){return r.assignmentId===asgn.assignmentId;});
   var perfects=lr.filter(function(r){return r.isPerfect;}).length+(isPerfect?1:0);
-  var attempts=lr.length+1;
-  var req=parseInt(asgn.requiredGoals,10)||3;
+  var attempts=lr.length+1, req=parseInt(asgn.requiredGoals,10)||3;
   var goalMet=asgn.mode==='homework'&&perfects>=req;
   var sc=score===100?'var(--vm-ok)':(score>=60?'#A66B00':'var(--vm-danger)');
 
@@ -537,7 +536,7 @@ function showResult(){
         '<button class="vm-btn vm-btn-ghost" id="backRes" style="padding:11px 20px">← Back</button>'+
       '</div>'+
     '</div>';
-  document.getElementById('tryAgain').onclick=function(){startQuiz(asgn,qs.quizMode);};
+  document.getElementById('tryAgain').onclick=function(){startQuiz(asgn);};
   document.getElementById('backRes').onclick=function(){switchTab(S.activeTab);};
 }
 function bdg(v,l){

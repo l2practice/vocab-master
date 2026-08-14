@@ -524,6 +524,30 @@ function renderAssignList() {
 }
 
 // ── Assignment Modal ───────────────────────────────────────────────
+function populateHWSourceSelect(){
+  var sel = document.getElementById('af-hw-source');
+  if(!sel) return;
+  var hwList = state.assignments.filter(function(a){ return a.mode==='homework'; });
+  sel.innerHTML = '<option value="">— create new from scratch —</option>' +
+    hwList.map(function(a){
+      return '<option value="'+VM.esc(a.assignmentId)+'">'+VM.esc(a.title)+'</option>';
+    }).join('');
+}
+
+// Wire "Load vocab" button
+document.addEventListener('click', function(e){
+  if(e.target.id !== 'af-load-hw-btn') return;
+  var aId = document.getElementById('af-hw-source').value;
+  if(!aId){ VM.toast('Select a homework assignment to load from.','warn'); return; }
+  var src = state.assignments.find(function(a){ return a.assignmentId===aId; });
+  if(!src||!src.vocab||!src.vocab.length){ VM.toast('No vocabulary found in that assignment.','err'); return; }
+  state.vocabRows = src.vocab.map(function(v){
+    return { word:v.word||'', ipa:v.ipa||'', synonyms:v.synonyms||[], vi:v.vi||v.meaningVi||'', meaningVi:v.vi||v.meaningVi||'' };
+  });
+  renderVocabTable();
+  VM.toast('Loaded '+state.vocabRows.length+' words from "'+src.title+'"','ok');
+});
+
 function populateClassSelect() {
   var sel = document.getElementById('af-class');
   sel.innerHTML = '<option value="">-- select class --</option>' +
@@ -567,8 +591,19 @@ function openAssignModal(asgn, defaultMode) {
   document.getElementById('af-key-status').textContent = savedKey ? '✅ Gemini key active — will process ALL words' : '';
 
   toggleGoalsField();
-  document.getElementById('af-mode').onchange = toggleGoalsField;
+  populateHWSourceSelect();
+  document.getElementById('af-mode').onchange = function(){
+    toggleGoalsField();
+    toggleLoadFromHW();
+  };
+  toggleLoadFromHW();
   document.getElementById('assignModal').classList.add('show');
+}
+
+function toggleLoadFromHW(){
+  var isIC = document.getElementById('af-mode').value === 'inclass';
+  var box  = document.getElementById('af-load-hw-wrap');
+  if(box) box.style.display = isIC ? '' : 'none';
 }
 
 function toggleGoalsField(){
