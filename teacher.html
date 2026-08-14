@@ -732,8 +732,8 @@ document.getElementById('assignSave').onclick = function(){
   if (state.editingAssignId) payload.assignmentId = state.editingAssignId;
 
   document.getElementById('assignSave').disabled = true;
-  showOverlay('Saving assignment…');
-  VM.api(action, payload).then(function(res){
+  showOverlay('Saving assignment… (vocab sent in chunks)');
+  VM.apiLarge(action, payload).then(function(res){
     document.getElementById('assignSave').disabled = false;
     if(res&&res.success){
       VM.toast(state.editingAssignId?'Assignment updated.':'Assignment saved!','ok');

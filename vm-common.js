@@ -8,7 +8,7 @@
 
   // ── CONFIG ─────────────────────────────────────
   // Replace with your deployed GAS /exec URL
-  var GAS = 'https://script.google.com/macros/s/AKfycbwe50uEyLe_oi__V_3eJ6JMfmbTqBbwR7u1md0JIGTGrILLOWoYSBCbqraXDltClqaf/exec';
+  var GAS = 'https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec';
 
   var VM = {
     GAS: GAS,
@@ -23,15 +23,48 @@
     Large payloads (>4KB) fall back to POST no-cors
     and rely on doPost returning JSONP via callback param.
   ─────────────────────────────────────────────────*/
+  /*── API ──────────────────────────────────────────
+    Always JSONP GET — the only method that works cross-origin
+    from GitHub Pages to GAS without CORS issues.
+    For payloads > URL limit, VM.apiChunked() splits them.
+  ─────────────────────────────────────────────────*/
   VM.api = function (action, payload) {
-    payload = payload || {};
-    // Small payloads → JSONP GET (works cross-origin, no preflight)
-    var encoded = JSON.stringify(payload);
-    if (encoded.length < 3500) {
-      return jsonp(action, payload);
-    }
-    // Large payloads → POST with callback for JSONP response
-    return gasPost(action, payload);
+    return jsonp(action, payload || {});
+  };
+
+  /*── VM.apiLarge — for assign.create / assign.update with vocab
+    Step 1: create/update without vocab (small payload → JSONP)
+    Step 2: patch vocab in chunks of 8 words via assign.appendVocab
+    Returns Promise<{success, data}>
+  ─────────────────────────────────────────────────*/
+  VM.apiLarge = function (action, payload) {
+    var vocab = (payload.vocab || []).slice();
+    var slim  = {};
+    for (var k in payload) { if (k !== 'vocab') slim[k] = payload[k]; }
+    slim.vocab = [];  // create/update with empty vocab first
+
+    return VM.api(action, slim).then(function (res) {
+      if (!res || !res.success) return res;
+      var assignmentId = (res.data && res.data.assignmentId) || payload.assignmentId;
+      if (!vocab.length) return res;
+
+      // Patch vocab in chunks of 8
+      var CHUNK = 8;
+      var chunks = [];
+      for (var i = 0; i < vocab.length; i += CHUNK) {
+        chunks.push(vocab.slice(i, i + CHUNK));
+      }
+
+      function sendChunk(idx) {
+        if (idx >= chunks.length) return Promise.resolve(res);
+        return VM.api('assign.appendVocab', {
+          assignmentId: assignmentId,
+          vocab: chunks[idx],
+          replace: idx === 0   // first chunk replaces, rest append
+        }).then(function () { return sendChunk(idx + 1); });
+      }
+      return sendChunk(0);
+    });
   };
 
   var _jsonpId = 0;
@@ -59,46 +92,6 @@
     });
   }
 
-  // POST for large payloads — GAS doPost must return JSONP when callback param present
-  function gasPost(action, payload) {
-    return new Promise(function (resolve, reject) {
-      var cb = 'vmcb_' + (++_jsonpId) + '_' + Date.now();
-      var timer = setTimeout(function () { cleanup(); reject(new Error('POST timeout')); }, 35000);
-      global[cb] = function (data) { cleanup(); resolve(data); };
-      function cleanup() {
-        clearTimeout(timer);
-        try { delete global[cb]; } catch (e) { global[cb] = undefined; }
-      }
-      fetch(GAS + '?callback=' + encodeURIComponent(cb), {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: action, payload: payload, callback: cb }),
-      }).catch(function () {
-        // no-cors → opaque response, rely on callback being called via script injection
-        // If callback fires, timer cleans up; if not, timeout handles it
-      });
-    });
-  }
-
-  /*── SESSION ─────────────────────────────────────
-    sessionStorage (no "remember") dies with tab.
-    localStorage (remember=true) persists, 12h TTL.
-    Idle-out: 45 min of no interaction → auto logout.
-    Gemini key stored separately, survives logout.
-  ─────────────────────────────────────────────────*/
-  var SKEY          = 'vm_session';
-  var IDLE_KEY      = 'vm_last_active';
-  var IDLE_LIMIT_MS = 45 * 60 * 1000;
-  var SESSION_TTL   = 12 * 60 * 60 * 1000;
-
-  function _refreshIdle() { try { localStorage.setItem(IDLE_KEY, String(Date.now())); } catch(e) {} }
-  function _isIdle() {
-    try {
-      var t = parseInt(localStorage.getItem(IDLE_KEY) || '0', 10);
-      return t > 0 && (Date.now() - t) > IDLE_LIMIT_MS;
-    } catch(e) { return false; }
-  }
 
   VM.session = {
     set: function (obj, opts) {
