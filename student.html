@@ -12,34 +12,93 @@
 .vm-reading-card{background:var(--vm-surface-2);border:1px solid var(--vm-border-2);border-radius:var(--vm-r);padding:20px 22px;margin-bottom:18px;max-height:280px;overflow-y:auto;line-height:1.78;font-size:.95rem;display:none}
 .vm-reading-card.show{display:block}
 .vm-reading-toggle{font-size:.82rem;color:var(--vm-primary);background:none;border:none;cursor:pointer;font-weight:600;padding:0;margin-bottom:10px}
-/* Result perfect pulse */
-@keyframes vm-perfect{0%{transform:scale(1)}50%{transform:scale(1.08)}100%{transform:scale(1)}}
-.vm-perfect-anim{animation:vm-perfect .6s ease}
-/* Quiz mode switcher */
+/* Quiz */
 .vm-mode-chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
 .vm-mode-chip{padding:6px 14px;border:1.5px solid var(--vm-border);border-radius:var(--vm-r-pill);font-size:.82rem;font-weight:600;cursor:pointer;background:var(--vm-surface);color:var(--vm-ink-2);font-family:var(--vm-font-body);transition:all .14s}
 .vm-mode-chip.active{background:var(--vm-primary);color:#fff;border-color:var(--vm-primary)}
+/* Result anim */
+@keyframes vm-perfect{0%{transform:scale(1)}50%{transform:scale(1.08)}100%{transform:scale(1)}}
+.vm-perfect-anim{animation:vm-perfect .6s ease}
+
+/* ─── CEFR Reader ─────────────────────────────────────────── */
+.cefr-shell{display:grid;grid-template-columns:1fr 320px;gap:20px;margin-top:10px}
+@media(max-width:900px){.cefr-shell{grid-template-columns:1fr}}
+
+/* Filter bar */
+.cefr-filterbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--vm-surface);border:1px solid var(--vm-border-2);border-radius:var(--vm-r-sm);padding:10px 14px;margin-bottom:12px;font-size:.82rem}
+.cefr-filterbar label{display:flex;align-items:center;gap:5px;cursor:pointer;font-weight:600}
+.cefr-filterbar .cefr-dot{width:10px;height:10px;border-radius:50%;display:inline-block;flex:0 0 auto}
+.cefr-filterbar .cefr-count{font-size:.7rem;color:var(--vm-ink-3);font-weight:400}
+.cefr-filterbar .cefr-sep{margin:0 4px;color:var(--vm-border);font-size:1.1rem}
+.cefr-filterbar .cefr-right{margin-left:auto;display:flex;gap:8px}
+
+/* Passage */
+.cefr-passage{background:var(--vm-surface);border:1px solid var(--vm-border-2);border-radius:var(--vm-r);padding:22px 24px;line-height:2;font-size:.97rem;color:var(--vm-ink);min-height:200px;position:relative}
+.cefr-passage.loading::after{content:'';position:absolute;inset:0;background:rgba(255,255,255,.6);border-radius:var(--vm-r);display:flex;align-items:center;justify-content:center}
+.vm-cefr-word{cursor:pointer;transition:filter .1s}
+.vm-cefr-word:hover{filter:brightness(.88)}
+.vm-cefr-word:focus{outline:2px solid var(--vm-primary);border-radius:3px}
+
+/* Right panel */
+.cefr-right-panel{display:flex;flex-direction:column;gap:14px}
+
+/* Key input */
+.cefr-key-box{background:var(--vm-surface-2);border:1px solid var(--vm-border-2);border-radius:var(--vm-r-sm);padding:12px 14px;font-size:.82rem}
+.cefr-key-box p{margin:0 0 8px;color:var(--vm-ink-2);font-weight:600}
+.cefr-key-row{display:flex;gap:6px}
+.cefr-key-row input{flex:1;border:1px solid var(--vm-border);border-radius:6px;padding:6px 9px;font-size:.82rem;background:var(--vm-surface);font-family:var(--vm-font-body)}
+.cefr-key-row input:focus{outline:none;border-color:var(--vm-primary)}
+.cefr-key-row button{background:var(--vm-primary);color:#fff;border:none;border-radius:6px;padding:6px 11px;font-size:.78rem;font-weight:600;cursor:pointer;white-space:nowrap}
+
+/* Breakdown bar */
+.cefr-breakdown{background:var(--vm-surface);border:1px solid var(--vm-border-2);border-radius:var(--vm-r-sm);padding:12px 14px}
+.cefr-breakdown h4{margin:0 0 10px;font-size:.82rem;font-weight:700;color:var(--vm-ink)}
+.cefr-bd-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:.78rem}
+.cefr-bd-row .lbl{width:28px;font-weight:700}
+.cefr-bd-bar-wrap{flex:1;background:var(--vm-border-2);border-radius:4px;height:7px;overflow:hidden}
+.cefr-bd-bar{height:100%;border-radius:4px;transition:width .4s}
+.cefr-bd-pct{width:36px;text-align:right;color:var(--vm-ink-3)}
+
+/* Collocations panel */
+.cefr-colloc{background:var(--vm-surface);border:1px solid var(--vm-border-2);border-radius:var(--vm-r-sm);padding:12px 14px}
+.cefr-colloc h4{margin:0 0 10px;font-size:.82rem;font-weight:700;color:var(--vm-ink);display:flex;align-items:center;gap:6px}
+.cefr-colloc-item{border-left:3px solid var(--vm-accent);padding:7px 10px;margin-bottom:8px;background:var(--vm-surface-2);border-radius:0 6px 6px 0}
+.cefr-colloc-phrase{font-weight:700;font-size:.85rem;color:var(--vm-primary-dk)}
+.cefr-colloc-vi{font-size:.76rem;color:var(--vm-ink-3);margin-top:2px}
+
+/* Vocab table CEFR badges */
+.vm-cefr-badge{display:inline-block;font-size:.65rem;font-weight:700;padding:1px 6px;border-radius:8px;margin-left:5px;vertical-align:middle}
+.vm-vocab-cefr-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.vm-vocab-cefr-card{background:var(--vm-surface-2);border:1px solid var(--vm-border-2);border-radius:8px;padding:8px 12px;min-width:140px;max-width:200px}
+.vm-vocab-cefr-card .word{font-weight:700;font-size:.9rem}
+.vm-vocab-cefr-card .ipa{font-size:.76rem;color:var(--vm-ink-3);margin-top:2px}
+.vm-vocab-cefr-card .vi{font-size:.8rem;color:var(--vm-ink-2);margin-top:3px;font-style:italic}
 </style>
 </head>
 <body>
 <div id="app"></div>
 
 <script src="vm-common.js"></script>
+<script src="cefr-dict.js"></script>
+<script src="vm-cefr.js"></script>
 <script>
 if (typeof VM === 'undefined') { location.href='login.html'; throw new Error('no VM'); }
 var sess = VM.session.require('student');
 if (!sess) throw new Error('not student');
 
-// ── State ─────────────────────────────────────────────────────────
+// ── CEFR available? ─────────────────────────────────────────
+var hasCEFR = typeof VMCEFR !== 'undefined';
+
+// ── State ───────────────────────────────────────────────────
 var S = {
-  assignments: [],  // all available assignments for student's class
-  myResults: [],    // student's own result records
-  quiz: null,       // active VM.buildQuiz() controller
-  quizState: null,  // { asgn, qIdx, correct, startTs, quizMode }
+  assignments: [],
+  myResults:   [],
+  quiz: null,
+  quizState: null,
   activeTab: 'home',
 };
 
-// ── Shell ─────────────────────────────────────────────────────────
+// ── Shell ────────────────────────────────────────────────────
 VM.renderShell({
   mount:'app', eyebrow:'VocabMaster', title:'Trang chủ',
   user: sess,
@@ -60,14 +119,14 @@ function switchTab(id){
   VM.setTitle(titles[id]||id);
   var c=document.getElementById('vmContent');
   c.innerHTML='<div class="vm-empty"><span class="vm-spin-dark" style="width:24px;height:24px;border-width:3px"></span></div>';
-  if(id==='home')     renderHome();
+  if(id==='home')      renderHome();
   else if(id==='homework')  renderAssignList('homework');
   else if(id==='inclass')   renderAssignList('inclass');
-  else if(id==='reading')   renderReading();
+  else if(id==='reading')   renderReadingList();
   else if(id==='history')   renderHistory();
 }
 
-// ── Load data ─────────────────────────────────────────────────────
+// ── Load data ────────────────────────────────────────────────
 function loadAssignments(cb){
   VM.api('assign.forStudent',{classId:sess.class}).then(function(res){
     if(res&&res.success) S.assignments=res.data||[];
@@ -81,22 +140,18 @@ function loadMyResults(cb){
   });
 }
 
-// ── Home ──────────────────────────────────────────────────────────
+// ── Home ─────────────────────────────────────────────────────
 function renderHome(){
   loadAssignments(function(){
     loadMyResults(function(){
       var c=document.getElementById('vmContent');
-
-      // KPI
       var hwCount=S.assignments.filter(function(a){return a.mode==='homework';}).length;
       var icCount=S.assignments.filter(function(a){return a.mode==='inclass';}).length;
       var doneCount=0;
       S.assignments.forEach(function(a){
         if(a.mode!=='homework') return;
-        var res=myResultsFor(a.assignmentId);
-        if(isPerfectGoalMet(a,res)) doneCount++;
+        if(isPerfectGoalMet(a,myResultsFor(a.assignmentId))) doneCount++;
       });
-
       c.innerHTML=
         '<div id="vmTodaysWord"></div>'+
         '<div class="vm-kpi-row">'+
@@ -108,7 +163,6 @@ function renderHome(){
         renderAssignCards(S.assignments.filter(function(a){return a.mode==='homework';}).slice(0,4),false)+
         '<h3 style="font-family:var(--vm-font-display);margin:20px 0 14px">🖥️ In-class</h3>'+
         renderAssignCards(S.assignments.filter(function(a){return a.mode==='inclass';}).slice(0,4),false);
-
       VM.renderTodaysWord('vmTodaysWord');
       bindAssignCards();
     });
@@ -121,29 +175,24 @@ function kpi(val,label,sub){
          '</div>';
 }
 
-// ── Assignment lists ───────────────────────────────────────────────
+// ── Assignment lists ──────────────────────────────────────────
 function renderAssignList(mode){
   loadAssignments(function(){
     loadMyResults(function(){
       var c=document.getElementById('vmContent');
       var items=S.assignments.filter(function(a){return a.mode===mode;});
-      if(!items.length){
-        c.innerHTML='<div class="vm-empty"><p>Chưa có bài tập nào.</p></div>'; return;
-      }
+      if(!items.length){ c.innerHTML='<div class="vm-empty"><p>Chưa có bài tập nào.</p></div>'; return; }
       c.innerHTML=renderAssignCards(items,true);
       bindAssignCards();
     });
   });
 }
 
-function myResultsFor(assignmentId){
-  return S.myResults.filter(function(r){return r.assignmentId===assignmentId;});
-}
+function myResultsFor(aid){ return S.myResults.filter(function(r){return r.assignmentId===aid;}); }
 function isPerfectGoalMet(asgn,results){
   if(asgn.mode!=='homework') return false;
   var req=parseInt(asgn.requiredGoals,10)||3;
-  var perfects=results.filter(function(r){return r.isPerfect;}).length;
-  return perfects>=req;
+  return results.filter(function(r){return r.isPerfect;}).length>=req;
 }
 
 function renderAssignCards(items,showAll){
@@ -155,15 +204,14 @@ function renderAssignCards(items,showAll){
     var req=parseInt(a.requiredGoals,10)||3;
     var done=a.mode==='homework'&&perfects>=req;
     var pct=a.mode==='homework'?Math.min(100,Math.round(perfects/req*100)):0;
-    var deadline=a.deadline?'⏰ Deadline: '+VM.esc(a.deadline):'∞ Không giới hạn';
-
+    var deadline=a.deadline?'⏰ '+VM.esc(a.deadline):'∞ Không giới hạn';
     return '<div class="vm-assign-card'+(done?' complete':'')+'" data-open-asgn="'+VM.esc(a.assignmentId)+'">'+
       '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">'+
         '<div class="vm-assign-card-title">'+VM.esc(a.title)+'</div>'+
-        (done?'<span style="color:var(--vm-ok);font-size:1.2rem" title="Hoàn thành!">✓</span>':'')+
+        (done?'<span style="color:var(--vm-ok);font-size:1.2rem">✓</span>':'')+
       '</div>'+
       '<div class="vm-assign-meta">'+
-        '<span>📚 '+VM.esc((a.vocab||[]).length)+' từ</span>'+
+        '<span>📚 '+(a.vocab||[]).length+' từ</span>'+
         '<span>'+deadline+'</span>'+
       '</div>'+
       (a.mode==='homework'?
@@ -174,15 +222,11 @@ function renderAssignCards(items,showAll){
           '</div>'+
           '<div class="vm-assign-pbar"><div class="vm-assign-pfill'+(done?' done':'')+'" style="width:'+pct+'%"></div></div>'+
         '</div>':
-        '<div style="font-size:.78rem;color:var(--vm-ink-3)">Attempts: '+attempts+'</div>'
-      )+
-      '<button class="vm-btn vm-btn-primary vm-btn-sm" style="margin-top:4px">'+
-        (attempts?'Làm lại →':'Bắt đầu →')+
-      '</button>'+
+        '<div style="font-size:.78rem;color:var(--vm-ink-3)">Attempts: '+attempts+'</div>')+
+      '<button class="vm-btn vm-btn-primary vm-btn-sm" style="margin-top:4px">'+(attempts?'Làm lại →':'Bắt đầu →')+'</button>'+
     '</div>';
   }).join('')+'</div>';
 }
-
 function bindAssignCards(){
   VM.els('[data-open-asgn]').forEach(function(card){
     card.onclick=function(){
@@ -193,46 +237,37 @@ function bindAssignCards(){
   });
 }
 
-// ── Quiz ───────────────────────────────────────────────────────────
+// ── Quiz ──────────────────────────────────────────────────────
 function openQuiz(asgn){
   var c=document.getElementById('vmContent');
   VM.setTitle(VM.esc(asgn.title));
-
-  // Choose quiz mode UI
   var modes=[
-    {id:'choice', label:'✦ Multiple Choice'},
-    {id:'blank',  label:'✍ Fill in Blank'},
-    {id:'spell',  label:'🔤 Spell the Word'},
+    {id:'choice',label:'✦ Multiple Choice'},
+    {id:'blank', label:'✍ Fill in Blank'},
+    {id:'spell', label:'🔤 Spell the Word'},
   ];
-
   c.innerHTML=
     '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="backBtn" style="margin-bottom:16px">← Back</button>'+
-    (asgn.reading?'<button class="vm-reading-toggle" id="readToggle">📖 Show Reading Passage</button>':'') +
+    (asgn.reading?'<button class="vm-reading-toggle" id="readToggle">📖 Show Reading Passage</button>':'')+
     '<div class="vm-reading-card" id="readCard">'+
       '<h2 style="font-family:var(--vm-font-display);font-size:1.1rem;margin:0 0 12px;color:var(--vm-primary-dk)">Reading Passage</h2>'+
       '<p style="margin:0;white-space:pre-wrap">'+VM.esc(asgn.reading||'')+'</p>'+
     '</div>'+
+    // CEFR vocab summary for homework
+    (hasCEFR && asgn.vocab && asgn.vocab.length ? renderVocabCEFR(asgn.vocab) : '')+
     '<h3 style="font-family:var(--vm-font-display);margin:0 0 10px">Chọn dạng câu hỏi</h3>'+
     '<div class="vm-mode-chips">'+
-      modes.map(function(m){
-        return '<button class="vm-mode-chip'+(m.id==='choice'?' active':'')+'" data-qmode="'+m.id+'">'+m.label+'</button>';
-      }).join('')+
+      modes.map(function(m){return '<button class="vm-mode-chip'+(m.id==='choice'?' active':'')+'" data-qmode="'+m.id+'">'+m.label+'</button>';}).join('')+
     '</div>'+
     '<div id="quizArea"></div>';
 
-  document.getElementById('backBtn').onclick=function(){
-    S.quiz=null; S.quizState=null;
-    switchTab(S.activeTab);
-  };
-
+  document.getElementById('backBtn').onclick=function(){ S.quiz=null; S.quizState=null; switchTab(S.activeTab); };
   var readToggle=document.getElementById('readToggle');
-  if(readToggle){
-    readToggle.onclick=function(){
-      var rc=document.getElementById('readCard');
-      rc.classList.toggle('show');
-      readToggle.textContent=rc.classList.contains('show')?'📖 Hide Reading':'📖 Show Reading Passage';
-    };
-  }
+  if(readToggle) readToggle.onclick=function(){
+    var rc=document.getElementById('readCard');
+    rc.classList.toggle('show');
+    readToggle.textContent=rc.classList.contains('show')?'📖 Hide Reading':'📖 Show Reading Passage';
+  };
 
   var activeMode='choice';
   VM.els('[data-qmode]').forEach(function(btn){
@@ -242,30 +277,44 @@ function openQuiz(asgn){
       startQuiz(asgn, activeMode);
     };
   });
-  startQuiz(asgn, 'choice');
+  startQuiz(asgn,'choice');
+}
+
+/* CEFR vocab cards for homework view */
+function renderVocabCEFR(vocab){
+  if(!hasCEFR||!vocab.length) return '';
+  var html='<div style="margin-bottom:16px"><h4 style="font-family:var(--vm-font-display);font-size:.88rem;margin:0 0 8px;color:var(--vm-ink)">📊 Vocabulary CEFR</h4><div class="vm-vocab-cefr-row">';
+  vocab.forEach(function(v){
+    var lemma=VMCEFR.lemmatize(v.word.toLowerCase());
+    var entry=lemma?CEFR_MAP[lemma]:null;
+    var info=entry?VMCEFR.analyze(v.word)[0]:null;
+    var level=info&&info.level?VMCEFR.LEVEL_NAME[info.level]:null;
+    html+='<div class="vm-vocab-cefr-card">'+
+      '<div class="word">'+VM.esc(v.word)+
+        (level?'<span class="vm-cefr-badge" style="background:'+VMCEFR.LEVEL_COLOR[Object.keys(VMCEFR.LEVEL_NAME).find(function(k){return VMCEFR.LEVEL_NAME[k]===level;})]+';color:#fff">'+level+'</span>':'')+
+      '</div>'+
+      (v.ipa?'<div class="ipa">/'+VM.esc(v.ipa)+'/</div>':'')+
+      (v.vi||v.meaningVi?'<div class="vi">'+VM.esc(v.vi||v.meaningVi)+'</div>':'')+
+    '</div>';
+  });
+  return html+'</div></div>';
 }
 
 function startQuiz(asgn, mode){
   var vocab=asgn.vocab||[];
-  if(!vocab.length){
-    document.getElementById('quizArea').innerHTML='<div class="vm-empty"><p>Bài tập này chưa có từ vựng.</p></div>';
-    return;
-  }
-  S.quiz = VM.buildQuiz(vocab, { mode:mode, shuffle:true });
-  S.quizState = { asgn:asgn, qIdx:0, correct:0, startTs:Date.now(), quizMode:mode };
+  if(!vocab.length){ document.getElementById('quizArea').innerHTML='<div class="vm-empty"><p>Bài tập này chưa có từ vựng.</p></div>'; return; }
+  S.quiz=VM.buildQuiz(vocab,{mode:mode,shuffle:true});
+  S.quizState={asgn:asgn,qIdx:0,correct:0,startTs:Date.now(),quizMode:mode};
   renderQuestion();
 }
 
 function renderQuestion(){
-  var qs=S.quizState, q=S.quiz.questions[qs.qIdx];
-  var total=S.quiz.questions.length;
+  var qs=S.quizState, q=S.quiz.questions[qs.qIdx], total=S.quiz.questions.length;
   var pct=Math.round(qs.qIdx/total*100);
-
-  var areaHtml=
+  document.getElementById('quizArea').innerHTML=
     '<div class="vm-quiz-wrap">'+
       '<div class="vm-quiz-header">'+
-        '<div class="vm-quiz-progress">'+
-          'Câu '+( qs.qIdx+1)+'/'+total+
+        '<div class="vm-quiz-progress">Câu '+(qs.qIdx+1)+'/'+total+
           '<div class="vm-quiz-bar"><div class="vm-quiz-bar-fill" style="width:'+pct+'%"></div></div>'+
         '</div>'+
         '<span style="font-size:.82rem;color:var(--vm-ink-3)">✓ '+qs.correct+' đúng</span>'+
@@ -277,36 +326,25 @@ function renderQuestion(){
         buildAnswerInput(q)+
       '</div>'+
     '</div>';
-
-  document.getElementById('quizArea').innerHTML=areaHtml;
   bindAnswerInput(q);
 }
 
 function buildAnswerInput(q){
-  if(S.quiz.mode==='choice'||S.quiz.mode==='match'){
+  if(S.quiz.mode==='choice'||S.quiz.mode==='match')
     return '<div class="vm-quiz-options">'+
-      q.options.map(function(opt){
-        return '<button class="vm-opt" data-ans="'+VM.esc(opt)+'">'+VM.esc(opt)+'</button>';
-      }).join('')+
+      q.options.map(function(opt){return '<button class="vm-opt" data-ans="'+VM.esc(opt)+'">'+VM.esc(opt)+'</button>';}).join('')+
     '</div><div class="vm-quiz-fb" id="qFb"></div>';
-  } else {
-    return '<input class="vm-quiz-input" id="qInput" placeholder="Type your answer…" autocomplete="off" spellcheck="false">'+
-           '<div class="vm-quiz-fb" id="qFb"></div>'+
-           '<div style="margin-top:12px;text-align:right">'+
-             '<button class="vm-btn vm-btn-primary" id="qSubmit">Check →</button>'+
-           '</div>';
-  }
+  return '<input class="vm-quiz-input" id="qInput" placeholder="Type your answer…" autocomplete="off" spellcheck="false">'+
+    '<div class="vm-quiz-fb" id="qFb"></div>'+
+    '<div style="margin-top:12px;text-align:right"><button class="vm-btn vm-btn-primary" id="qSubmit">Check →</button></div>';
 }
 
 function bindAnswerInput(q){
   var answered=false;
-
   function handleAnswer(ans){
-    if(answered) return;
-    answered=true;
-    var res=S.quiz.check(S.quizState.qIdx, ans);
+    if(answered) return; answered=true;
+    var res=S.quiz.check(S.quizState.qIdx,ans);
     var fb=document.getElementById('qFb');
-
     if(S.quiz.mode==='choice'||S.quiz.mode==='match'){
       VM.els('[data-ans]').forEach(function(btn){
         btn.disabled=true;
@@ -317,196 +355,338 @@ function bindAnswerInput(q){
       var inp=document.getElementById('qInput');
       if(inp){inp.disabled=true;inp.classList.add(res.correct?'correct':'wrong');}
     }
-
-    if(fb){
-      fb.className='vm-quiz-fb '+(res.correct?'ok':'bad');
-      fb.textContent=res.correct?'✓ Đúng!':'✗ Sai. Đáp án: '+res.correctAnswer;
-    }
+    if(fb){fb.className='vm-quiz-fb '+(res.correct?'ok':'bad');fb.textContent=res.correct?'✓ Đúng!':'✗ Sai. Đáp án: '+res.correctAnswer;}
     if(res.correct) S.quizState.correct++;
-
     setTimeout(function(){
       S.quizState.qIdx++;
-      if(S.quizState.qIdx >= S.quiz.questions.length) showResult();
+      if(S.quizState.qIdx>=S.quiz.questions.length) showResult();
       else renderQuestion();
     }, res.correct?800:1600);
   }
-
   if(S.quiz.mode==='choice'||S.quiz.mode==='match'){
-    VM.els('[data-ans]').forEach(function(btn){
-      btn.onclick=function(){ handleAnswer(btn.getAttribute('data-ans')); };
-    });
+    VM.els('[data-ans]').forEach(function(btn){ btn.onclick=function(){handleAnswer(btn.getAttribute('data-ans'));}; });
   } else {
-    var inp=document.getElementById('qInput');
-    var sub=document.getElementById('qSubmit');
+    var inp=document.getElementById('qInput'), sub=document.getElementById('qSubmit');
     if(inp) inp.focus();
-    if(sub) sub.onclick=function(){ if(inp) handleAnswer(inp.value); };
-    if(inp) inp.onkeydown=function(e){ if(e.key==='Enter') handleAnswer(inp.value); };
+    if(sub) sub.onclick=function(){if(inp) handleAnswer(inp.value);};
+    if(inp) inp.onkeydown=function(e){if(e.key==='Enter') handleAnswer(inp.value);};
   }
 }
 
 function showResult(){
-  var qs=S.quizState;
-  var total=S.quiz.questions.length;
-  var score=Math.round(qs.correct/total*100);
-  var isPerfect=score===100;
+  var qs=S.quizState, total=S.quiz.questions.length;
+  var score=Math.round(qs.correct/total*100), isPerfect=score===100;
   var durationSec=Math.round((Date.now()-qs.startTs)/1000);
   var asgn=qs.asgn;
-
-  // Save to backend
   VM.api('result.save',{
-    studentId:sess.studentId, name:sess.name, class:sess.class||asgn.classId,
-    assignmentId:asgn.assignmentId, title:asgn.title, mode:asgn.mode,
-    score:score, isPerfect:isPerfect, durationSec:durationSec,
-    correct:qs.correct, total:total
-  }).then(function(res){
-    if(!res||!res.success) VM.toast('Lưu kết quả thất bại: '+(res&&res.error),'err');
-    else loadMyResults(function(){});
-  });
+    studentId:sess.studentId,name:sess.name,class:sess.class||asgn.classId,
+    assignmentId:asgn.assignmentId,title:asgn.title,mode:asgn.mode,
+    score:score,isPerfect:isPerfect,durationSec:durationSec,correct:qs.correct,total:total
+  }).then(function(r){ if(r&&r.success) loadMyResults(function(){}); });
 
-  // Reload fresh result count
-  var localRes = S.myResults.filter(function(r){return r.assignmentId===asgn.assignmentId;});
-  var perfects  = localRes.filter(function(r){return r.isPerfect;}).length + (isPerfect?1:0);
-  var attempts  = localRes.length + 1;
-  var req       = parseInt(asgn.requiredGoals,10)||3;
-  var goalMet   = asgn.mode==='homework' && perfects>=req;
-
-  var scoreColor = score===100?'var(--vm-ok)':(score>=60?'#A66B00':'var(--vm-danger)');
-
+  var localRes=S.myResults.filter(function(r){return r.assignmentId===asgn.assignmentId;});
+  var perfects=localRes.filter(function(r){return r.isPerfect;}).length+(isPerfect?1:0);
+  var attempts=localRes.length+1;
+  var req=parseInt(asgn.requiredGoals,10)||3;
+  var goalMet=asgn.mode==='homework'&&perfects>=req;
+  var sc=score===100?'var(--vm-ok)':(score>=60?'#A66B00':'var(--vm-danger)');
   document.getElementById('quizArea').innerHTML=
     '<div class="vm-result-banner'+(isPerfect?' vm-perfect-anim':'')+'" style="margin-top:10px">'+
       (isPerfect?'<div style="font-size:2rem;margin-bottom:6px">🎉</div>':'')+
-      '<div class="vm-result-score" style="color:'+scoreColor+'">'+score+'%</div>'+
+      '<div class="vm-result-score" style="color:'+sc+'">'+score+'%</div>'+
       '<div class="vm-result-label">'+qs.correct+'/'+total+' câu đúng</div>'+
       '<div class="vm-result-badges">'+
         badge(VM.fmtDuration(durationSec),'Thời gian')+
         (asgn.mode==='homework'?
           badge(attempts,'Attempts')+
-          '<div class="vm-result-badge">'+
-            '<div class="val" style="color:'+(goalMet?'var(--vm-ok)':'var(--vm-ink)')+'">'+perfects+'/'+req+'</div>'+
-            '<div class="lbl">Goals'+(goalMet?' ✓':'')+'</div>'+
-          '</div>':'') +
+          '<div class="vm-result-badge"><div class="val" style="color:'+(goalMet?'var(--vm-ok)':'var(--vm-ink)')+'">'+perfects+'/'+req+'</div><div class="lbl">Goals'+(goalMet?' ✓':'')+'</div></div>':'') +
       '</div>'+
-      (goalMet?'<div style="margin-top:16px;color:var(--vm-ok);font-weight:700;font-size:.95rem">🏆 Bạn đã hoàn thành bài tập này!</div>':
-        (asgn.mode==='homework'?'<div style="margin-top:10px;font-size:.84rem;color:var(--vm-ink-3)">Cần thêm '+(req-perfects)+' lần 100% để hoàn thành.</div>':''))+
+      (goalMet?'<div style="margin-top:16px;color:var(--vm-ok);font-weight:700">🏆 Hoàn thành bài tập!</div>':
+        (asgn.mode==='homework'?'<div style="margin-top:10px;font-size:.84rem;color:var(--vm-ink-3)">Cần thêm '+(req-perfects)+' lần 100%.</div>':''))+
       '<div style="display:flex;gap:12px;justify-content:center;margin-top:20px">'+
         '<button class="vm-btn vm-btn-primary" id="tryAgain">Làm lại</button>'+
         '<button class="vm-btn vm-btn-ghost" id="backFromResult">← Về danh sách</button>'+
       '</div>'+
     '</div>';
-
-  document.getElementById('tryAgain').onclick = function(){ startQuiz(asgn, qs.quizMode); };
-  document.getElementById('backFromResult').onclick = function(){ switchTab(S.activeTab); };
+  document.getElementById('tryAgain').onclick=function(){startQuiz(asgn,qs.quizMode);};
+  document.getElementById('backFromResult').onclick=function(){switchTab(S.activeTab);};
 }
-
 function badge(val,lbl){
   return '<div class="vm-result-badge"><div class="val">'+VM.esc(String(val))+'</div><div class="lbl">'+VM.esc(lbl)+'</div></div>';
 }
 
-// ── Free Reading (ReadWise-style) ─────────────────────────────────
-function renderReading(){
+// ── Free Reading with CEFR Reader ─────────────────────────────
+function renderReadingList(){
   var c=document.getElementById('vmContent');
-  c.innerHTML=
-    '<p style="color:var(--vm-ink-2);margin:0 0 20px">Đọc bài và trả lời câu hỏi đọc hiểu.</p>'+
-    '<div id="rwList"><div class="vm-empty"><p>Đang tải…</p></div></div>';
-
+  c.innerHTML='<p style="color:var(--vm-ink-2);margin:0 0 20px">Đọc bài và phân tích từ vựng CEFR.</p>'+
+    '<div id="rwList"><div class="vm-empty"><span class="vm-spin-dark" style="width:22px;height:22px;border-width:3px"></span></div></div>';
   loadAssignments(function(){
     var items=S.assignments.filter(function(a){return a.reading&&a.reading.trim();});
     var box=document.getElementById('rwList');
-    if(!items.length){
-      box.innerHTML='<div class="vm-empty"><p>Giáo viên chưa giao bài đọc nào.</p></div>'; return;
-    }
+    if(!items.length){ box.innerHTML='<div class="vm-empty"><p>Giáo viên chưa giao bài đọc nào.</p></div>'; return; }
     box.innerHTML='<div class="vm-assign-grid">'+items.map(function(a){
       return '<div class="vm-assign-card" data-read-open="'+VM.esc(a.assignmentId)+'">'+
         '<div class="vm-assign-card-title">'+VM.esc(a.title)+'</div>'+
-        '<div class="vm-assign-meta"><span>📖 Có đoạn đọc</span><span>📚 '+VM.esc((a.vocab||[]).length)+' từ</span></div>'+
-        '<button class="vm-btn vm-btn-ghost vm-btn-sm" style="margin-top:4px">Đọc và làm bài →</button>'+
+        '<div class="vm-assign-meta"><span>📖 Đoạn đọc</span><span>📚 '+(a.vocab||[]).length+' từ mục tiêu</span></div>'+
+        '<button class="vm-btn vm-btn-ghost vm-btn-sm" style="margin-top:4px">Đọc & Phân tích →</button>'+
       '</div>';
     }).join('')+'</div>';
     VM.els('[data-read-open]').forEach(function(card){
       card.onclick=function(){
         var aId=card.getAttribute('data-read-open');
         var asgn=S.assignments.find(function(a){return a.assignmentId===aId;});
-        if(asgn) openReadWise(asgn);
+        if(asgn) openCEFRReader(asgn);
       };
     });
   });
 }
 
-function openReadWise(asgn){
+function openCEFRReader(asgn){
   var c=document.getElementById('vmContent');
   VM.setTitle(asgn.title);
 
-  // Build comprehension questions from vocab (definition matching)
-  var vocab=asgn.vocab||[];
-  var compQs=vocab.slice(0,8).map(function(v){
-    var others=vocab.filter(function(x){return x.word!==v.word;});
-    var wrong=VM._shuffle(others.slice()).slice(0,3);
-    var opts=VM._shuffle([v].concat(wrong)).map(function(x){return x.vi||x.meaningVi||x.word;});
-    return { word:v.word, question:'What is the Vietnamese meaning of "'+v.word+'"?',
-             options:opts, answer:v.vi||v.meaningVi||v.word };
-  });
+  // Visible levels state
+  var visibleLevels={A1:true,A2:true,B1:true,B2:true,C1:true,C2:true};
+  var colorByPOS=false;
+  var meanings={};
+  var collocs=[];
 
-  var answered={}; var correct=0;
+  // Get saved Gemini key
+  var geminiKey=VM.geminiKey.get();
 
-  c.innerHTML=
-    '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="rwBack" style="margin-bottom:16px">← Back</button>'+
-    '<h2 style="font-family:var(--vm-font-display);font-size:1.2rem;margin:0 0 14px">'+VM.esc(asgn.title)+'</h2>'+
-    '<div class="vm-rw-split">'+
-      '<div class="vm-rw-passage">'+
-        '<h2>Reading Passage</h2>'+
-        '<div style="white-space:pre-wrap">'+VM.esc(asgn.reading||'No passage provided.')+'</div>'+
-      '</div>'+
-      '<div class="vm-rw-quiz" id="rwQs">'+
-        compQs.map(function(q,i){
-          return '<div class="vm-rw-q" id="rwq'+i+'">'+
-            '<div class="vm-rw-q-text">'+VM.esc(q.question)+'</div>'+
-            '<div class="vm-rw-opts">'+
-              q.options.map(function(opt){
-                return '<button class="vm-rw-opt" data-rq="'+i+'" data-ans="'+VM.esc(opt)+'">'+VM.esc(opt)+'</button>';
-              }).join('')+
-            '</div>'+
-          '</div>';
-        }).join('')+
-        (compQs.length?'<div id="rwScore" style="display:none;padding:16px;background:var(--vm-surface-2);border-radius:var(--vm-r);text-align:center"></div>':'<div class="vm-empty"><p>Không có từ để tạo câu hỏi.</p></div>')+
+  function renderAll(){
+    var passage=asgn.reading||'';
+    var vocabList=asgn.vocab||[];
+    var html;
+    if(hasCEFR){
+      html=VMCEFR.renderPassage(passage,{
+        visibleLevels:visibleLevels,
+        meanings:meanings,
+        vocabHighlight:vocabList.map(function(v){return v.word;})
+      });
+    } else {
+      html=VM.esc(passage).replace(/\n/g,'<br>');
+    }
+    return html;
+  }
+
+  function buildBreakdown(){
+    if(!hasCEFR) return '';
+    var tokens=VMCEFR.analyze(asgn.reading||'');
+    var bd=VMCEFR.breakdown(tokens);
+    var levels=['A1','A2','B1','B2','C1','C2'];
+    var rows=levels.map(function(lv){
+      var count=bd[lv]||0;
+      var pct=bd.total>0?Math.round(count/bd.total*100):0;
+      var lnum=VMCEFR.LEVEL_NUM[lv];
+      var col=VMCEFR.LEVEL_COLOR[String(lnum)];
+      return '<div class="cefr-bd-row">'+
+        '<span class="lbl" style="color:'+col+'">'+lv+'</span>'+
+        '<div class="cefr-bd-bar-wrap"><div class="cefr-bd-bar" style="width:'+pct+'%;background:'+col+'"></div></div>'+
+        '<span class="cefr-bd-pct">'+pct+'%</span>'+
+        '<span style="font-size:.72rem;color:var(--vm-ink-3);min-width:24px">'+count+'</span>'+
+      '</div>';
+    }).join('');
+    return '<div class="cefr-breakdown"><h4>CEFR Breakdown</h4>'+rows+'<div style="font-size:.72rem;color:var(--vm-ink-3);margin-top:6px">Total analysed: '+bd.total+' từ</div></div>';
+  }
+
+  function buildFilterBar(){
+    if(!hasCEFR) return '';
+    var tokens=VMCEFR.analyze(asgn.reading||'');
+    var bd=VMCEFR.breakdown(tokens);
+    var levels=['A1','A2','B1','B2','C1','C2'];
+    var html='<div class="cefr-filterbar"><span style="font-weight:700;color:var(--vm-ink-2);font-size:.8rem">CEFR:</span>';
+    levels.forEach(function(lv){
+      var lnum=VMCEFR.LEVEL_NUM[lv];
+      var col=VMCEFR.LEVEL_COLOR[String(lnum)];
+      var count=bd[lv]||0;
+      html+='<label data-filter-lv="'+lv+'">'+
+        '<input type="checkbox" checked data-lv="'+lv+'" style="display:none">'+
+        '<span class="cefr-dot" style="background:'+col+'"></span>'+
+        ' <span style="color:'+col+'">'+lv+'</span> '+
+        '<span class="cefr-count">'+count+'</span>'+
+      '</label>';
+    });
+    html+='<span class="cefr-sep">│</span>'+
+      '<div class="cefr-right">'+
+        (geminiKey
+          ? '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="cefrAnalyseBtn" style="font-size:.78rem;padding:5px 10px">✨ AI Dịch</button>'+
+            '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="cefrCollocBtn" style="font-size:.78rem;padding:5px 10px">🔗 Collocations</button>'
+          : '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="cefrKeyBtn" style="font-size:.78rem;padding:5px 10px">🔑 Nhập Gemini key</button>')+
       '</div>'+
     '</div>';
+    return html;
+  }
 
-  document.getElementById('rwBack').onclick=function(){switchTab('reading');};
+  function render(){
+    c.innerHTML=
+      '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="rwBack" style="margin-bottom:16px">← Back</button>'+
+      '<h2 style="font-family:var(--vm-font-display);font-size:1.2rem;margin:0 0 14px">'+VM.esc(asgn.title)+'</h2>'+
+      buildFilterBar()+
+      // Key input if no key
+      (!geminiKey?
+        '<div class="cefr-key-box" style="margin-bottom:12px">'+
+          '<p>Nhập Gemini API key để AI dịch nghĩa và tìm collocations (miễn phí):</p>'+
+          '<div class="cefr-key-row">'+
+            '<input id="cefrKeyInput" type="password" placeholder="AIza…">'+
+            '<button id="cefrKeySave">Lưu key</button>'+
+          '</div>'+
+        '</div>':'') +
+      '<div class="cefr-shell">'+
+        '<div>'+
+          '<div class="cefr-passage" id="cefrPassage">'+renderAll()+'</div>'+
+        '</div>'+
+        '<div class="cefr-right-panel">'+
+          buildBreakdown()+
+          '<div class="cefr-colloc" id="cefrColloc" style="display:none">'+
+            '<h4>🔗 Phrases &amp; Collocations</h4>'+
+            '<div id="cefrCollocList"></div>'+
+          '</div>'+
+        '</div>'+
+      '</div>';
 
-  VM.els('[data-rq]').forEach(function(btn){
-    btn.onclick=function(){
-      var qi=parseInt(btn.getAttribute('data-rq'),10);
-      if(answered[qi]) return;
-      answered[qi]=true;
-      var q=compQs[qi];
-      var isCorrect=btn.getAttribute('data-ans')===q.answer;
-      if(isCorrect) correct++;
-      // Mark all options
-      var parent=document.getElementById('rwq'+qi);
-      parent.querySelectorAll('[data-rq]').forEach(function(b){
-        b.disabled=true;
-        if(b.getAttribute('data-ans')===q.answer) b.classList.add('correct');
-        else if(b===btn&&!isCorrect) b.classList.add('wrong');
+    document.getElementById('rwBack').onclick=function(){switchTab('reading');};
+
+    // Filter checkboxes
+    VM.els('[data-lv]').forEach(function(inp){
+      // Find parent label, toggle on click
+      inp.closest('label').onclick=function(e){
+        e.preventDefault();
+        var lv=inp.getAttribute('data-lv');
+        visibleLevels[lv]=!visibleLevels[lv];
+        inp.closest('label').style.opacity=visibleLevels[lv]?'1':'.4';
+        document.getElementById('cefrPassage').innerHTML=renderAll();
+        bindPassageClicks();
+      };
+      inp.closest('label').style.opacity=visibleLevels[inp.getAttribute('data-lv')]?'1':'.4';
+    });
+
+    // AI translate
+    var analyseBtn=document.getElementById('cefrAnalyseBtn');
+    if(analyseBtn) analyseBtn.onclick=function(){
+      if(!geminiKey){VM.toast('Nhập Gemini key trước.','warn');return;}
+      analyseBtn.disabled=true;
+      analyseBtn.textContent='⏳ Đang dịch…';
+      // Collect unique non-stopword tokens with CEFR level
+      var tokens=VMCEFR.analyze(asgn.reading||'');
+      var words=[];
+      var seen={};
+      tokens.forEach(function(t){
+        if(t.level && !seen[t.clean.toLowerCase()]){
+          seen[t.clean.toLowerCase()]=true;
+          words.push(t.clean.toLowerCase());
+        }
       });
-      // Check if all answered
-      if(Object.keys(answered).length===compQs.length){
-        var sc=document.getElementById('rwScore');
-        sc.style.display='';
-        var pct=Math.round(correct/compQs.length*100);
-        sc.innerHTML='<div style="font-family:var(--vm-font-display);font-size:2rem;font-weight:700;color:'+(pct===100?'var(--vm-ok)':'var(--vm-primary)')+'">'+pct+'%</div>'+
-          '<div style="font-size:.88rem;color:var(--vm-ink-2);margin-top:4px">'+correct+'/'+compQs.length+' câu đúng</div>';
-      }
+      VMCEFR.fetchMeanings(words, geminiKey, asgn.vocab||[]).then(function(map){
+        meanings=map;
+        document.getElementById('cefrPassage').innerHTML=renderAll();
+        bindPassageClicks();
+        analyseBtn.disabled=false;
+        analyseBtn.textContent='✨ AI Dịch';
+        VM.toast('Đã dịch '+Object.keys(map).length+' từ','ok');
+      });
     };
-  });
+
+    // Collocations
+    var collocBtn=document.getElementById('cefrCollocBtn');
+    if(collocBtn) collocBtn.onclick=function(){
+      if(!geminiKey){VM.toast('Nhập Gemini key trước.','warn');return;}
+      collocBtn.disabled=true; collocBtn.textContent='⏳ Đang phân tích…';
+      VMCEFR.collocations(asgn.reading||'',geminiKey).then(function(list){
+        collocs=list;
+        var box=document.getElementById('cefrColloc');
+        var listEl=document.getElementById('cefrCollocList');
+        box.style.display='';
+        listEl.innerHTML=collocs.map(function(item){
+          return '<div class="cefr-colloc-item">'+
+            '<div class="cefr-colloc-phrase">'+VM.esc(item.phrase)+'</div>'+
+            '<div class="cefr-colloc-vi">'+VM.esc(item.meaning)+'</div>'+
+          '</div>';
+        }).join('');
+        collocBtn.disabled=false; collocBtn.textContent='🔗 Collocations';
+        VM.toast('Tìm được '+list.length+' cụm từ','ok');
+      });
+    };
+
+    // Key save
+    var keyBtn=document.getElementById('cefrKeyBtn');
+    if(keyBtn) keyBtn.onclick=function(){
+      var box=document.getElementById('cefrKeyInputBox');
+      if(box) box.style.display=box.style.display==='none'?'':' none';
+    };
+    var keySave=document.getElementById('cefrKeySave');
+    if(keySave) keySave.onclick=function(){
+      var val=(document.getElementById('cefrKeyInput').value||'').trim();
+      if(!val){VM.toast('Nhập API key.','warn');return;}
+      VM.geminiKey.set(val);
+      geminiKey=val;
+      render(); // re-render with key available
+    };
+
+    bindPassageClicks();
+  }
+
+  function bindPassageClicks(){
+    VM.els('.vm-cefr-word').forEach(function(span){
+      span.onclick=function(){
+        var word=span.getAttribute('data-word');
+        var lemma=span.getAttribute('data-lemma');
+        var level=span.getAttribute('data-level');
+        var mData=meanings[word.toLowerCase()]||meanings[lemma]||null;
+        showWordTooltip(span, word, lemma, level, mData);
+      };
+    });
+  }
+
+  function showWordTooltip(anchor, word, lemma, level, mData){
+    // Remove existing tooltip
+    var old=document.getElementById('cefrTooltip');
+    if(old) old.remove();
+
+    var lnum=level&&VMCEFR.LEVEL_NUM[level];
+    var col=lnum?VMCEFR.LEVEL_COLOR[String(lnum)]:'#666';
+
+    var tip=document.createElement('div');
+    tip.id='cefrTooltip';
+    tip.style.cssText='position:fixed;z-index:9990;background:var(--vm-primary-dk,#0D4F3A);color:#fff;border-radius:10px;padding:10px 14px;font-size:.84rem;max-width:220px;box-shadow:0 8px 30px rgba(0,0,0,.3);pointer-events:auto;';
+    tip.innerHTML=
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'+
+        '<b style="font-size:1rem">'+VM.esc(word)+'</b>'+
+        (level?'<span style="background:'+col+';color:#fff;padding:2px 7px;border-radius:8px;font-size:.68rem;font-weight:700">'+level+'</span>':'')+
+      '</div>'+
+      (mData&&mData.ipa?'<div style="color:#A8E8C8;font-size:.8rem;margin-bottom:4px">/'+VM.esc(mData.ipa)+'/</div>':'')+
+      (mData&&mData.vi?'<div style="color:#E0F8EE">🇻🇳 '+VM.esc(mData.vi)+'</div>':
+        '<div style="color:#9BB;font-size:.78rem;font-style:italic">Bấm "✨ AI Dịch" để xem nghĩa</div>')+
+      (lemma&&lemma!==word?'<div style="color:#9BB;font-size:.72rem;margin-top:4px">lemma: '+VM.esc(lemma)+'</div>':'')+
+      '<button onclick="document.getElementById(\'cefrTooltip\').remove()" '+
+        'style="position:absolute;top:6px;right:8px;background:none;border:none;color:#9BB;cursor:pointer;font-size:1rem;line-height:1">×</button>';
+
+    var rect=anchor.getBoundingClientRect();
+    document.body.appendChild(tip);
+    // Position: above the word, centered
+    var tw=tip.offsetWidth, th=tip.offsetHeight;
+    var left=Math.max(8, Math.min(rect.left+rect.width/2-tw/2, window.innerWidth-tw-8));
+    var top=rect.top-th-8;
+    if(top<8) top=rect.bottom+8;
+    tip.style.left=left+'px'; tip.style.top=top+'px';
+    tip.style.position='fixed';
+
+    // Close on outside click
+    setTimeout(function(){
+      document.addEventListener('click',function closeTip(e){
+        if(!tip.contains(e.target)&&e.target!==anchor){tip.remove();document.removeEventListener('click',closeTip);}
+      });
+    },10);
+  }
+
+  render();
 }
 
-// ── History ───────────────────────────────────────────────────────
+// ── History ───────────────────────────────────────────────────
 function renderHistory(){
   loadMyResults(function(){
     var c=document.getElementById('vmContent');
-    if(!S.myResults.length){
-      c.innerHTML='<div class="vm-empty"><p>Chưa có lịch sử làm bài.</p></div>'; return;
-    }
+    if(!S.myResults.length){ c.innerHTML='<div class="vm-empty"><p>Chưa có lịch sử làm bài.</p></div>'; return; }
     var rows=S.myResults.slice().sort(function(a,b){return new Date(b.timestamp)-new Date(a.timestamp);});
     c.innerHTML=
       '<div class="vm-table-wrap"><table class="vm-table"><thead><tr>'+
@@ -521,14 +701,13 @@ function renderHistory(){
           '<td>'+VM.esc(r.correct+'/'+r.total)+'</td>'+
           '<td>'+VM.fmtDuration(r.durationSec)+'</td>'+
         '</tr>';
-      }).join('')+
-      '</tbody></table></div>';
+      }).join('')+'</tbody></table></div>';
   });
 }
 
-function scoreClass(s){ return s>=90?'vm-score-hi':(s>=60?'vm-score-mid':'vm-score-lo'); }
+function scoreClass(s){return s>=90?'vm-score-hi':(s>=60?'vm-score-mid':'vm-score-lo');}
 
-// ── Boot ──────────────────────────────────────────────────────────
+// ── Boot ──────────────────────────────────────────────────────
 switchTab('home');
 </script>
 </body>
