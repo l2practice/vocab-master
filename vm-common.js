@@ -93,6 +93,22 @@
   }
 
 
+
+  var SKEY          = 'vm_session';
+  var IDLE_KEY      = 'vm_last_active';
+  var IDLE_LIMIT_MS = 45 * 60 * 1000;
+  var SESSION_TTL   = 12 * 60 * 60 * 1000;
+
+  function _refreshIdle() {
+    try { localStorage.setItem(IDLE_KEY, String(Date.now())); } catch(e) {}
+  }
+  function _isIdle() {
+    try {
+      var t = parseInt(localStorage.getItem(IDLE_KEY) || '0', 10);
+      return t > 0 && (Date.now() - t) > IDLE_LIMIT_MS;
+    } catch(e) { return false; }
+  }
+
   VM.session = {
     set: function (obj, opts) {
       var remember = !!(opts && opts.remember === true);
