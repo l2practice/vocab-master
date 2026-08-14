@@ -8,7 +8,8 @@
 
   // ── CONFIG ─────────────────────────────────────
   // Replace with your deployed GAS /exec URL
-  var GAS = 'https://script.google.com/macros/s/AKfycbwe50uEyLe_oi__V_3eJ6JMfmbTqBbwR7u1md0JIGTGrILLOWoYSBCbqraXDltClqaf/exec';
+  var GAS = 'https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec';
+
   var VM = {
     GAS: GAS,
     LOGIN_PAGE:   'login.html',
@@ -17,40 +18,66 @@
   };
 
   /*── API ──────────────────────────────────────────
-    POST via fetch (preferred). Falls back to JSONP GET.
+    GitHub Pages → GAS: always use JSONP (GET with callback).
+    CORS blocks fetch POST from static origins.
+    Large payloads (>4KB) fall back to POST no-cors
+    and rely on doPost returning JSONP via callback param.
   ─────────────────────────────────────────────────*/
   VM.api = function (action, payload) {
     payload = payload || {};
-    return postJSON(action, payload).catch(function () {
+    // Small payloads → JSONP GET (works cross-origin, no preflight)
+    var encoded = JSON.stringify(payload);
+    if (encoded.length < 3500) {
       return jsonp(action, payload);
-    });
+    }
+    // Large payloads → POST with callback for JSONP response
+    return gasPost(action, payload);
   };
-
-  function postJSON(action, payload) {
-    return fetch(GAS, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: action, payload: payload }),
-      redirect: 'follow',
-    }).then(function (r) { return r.json(); });
-  }
 
   var _jsonpId = 0;
   function jsonp(action, payload) {
     return new Promise(function (resolve, reject) {
       var cb = 'vmcb_' + (++_jsonpId) + '_' + Date.now();
-      var timer = setTimeout(function () { cleanup(); reject(new Error('JSONP timeout')); }, 25000);
+      var timer = setTimeout(function () {
+        cleanup(); reject(new Error('Timeout — kiểm tra kết nối mạng hoặc GAS deployment.'));
+      }, 30000);
       global[cb] = function (data) { cleanup(); resolve(data); };
       function cleanup() {
         clearTimeout(timer);
         try { delete global[cb]; } catch (e) { global[cb] = undefined; }
         if (s && s.parentNode) s.parentNode.removeChild(s);
       }
-      var params = new URLSearchParams({ action: action, callback: cb, payload: JSON.stringify(payload) });
+      var params = new URLSearchParams({
+        action: action,
+        callback: cb,
+        payload: JSON.stringify(payload)
+      });
       var s = document.createElement('script');
       s.src = GAS + '?' + params.toString();
-      s.onerror = function () { cleanup(); reject(new Error('JSONP network error')); };
+      s.onerror = function () { cleanup(); reject(new Error('Network error — không tải được GAS script.')); };
       document.head.appendChild(s);
+    });
+  }
+
+  // POST for large payloads — GAS doPost must return JSONP when callback param present
+  function gasPost(action, payload) {
+    return new Promise(function (resolve, reject) {
+      var cb = 'vmcb_' + (++_jsonpId) + '_' + Date.now();
+      var timer = setTimeout(function () { cleanup(); reject(new Error('POST timeout')); }, 35000);
+      global[cb] = function (data) { cleanup(); resolve(data); };
+      function cleanup() {
+        clearTimeout(timer);
+        try { delete global[cb]; } catch (e) { global[cb] = undefined; }
+      }
+      fetch(GAS + '?callback=' + encodeURIComponent(cb), {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: action, payload: payload, callback: cb }),
+      }).catch(function () {
+        // no-cors → opaque response, rely on callback being called via script injection
+        // If callback fires, timer cleans up; if not, timeout handles it
+      });
     });
   }
 
@@ -457,9 +484,24 @@
   VM.analyzeVocab = function (rawList, apiKey, onProgress) {
     var lines = rawList.split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
     var parsed = lines.map(function (l) {
-      var parts = l.split('=');
-      return { word: parts[0].trim(), hint: (parts[1] || '').trim() };
-    });
+      // Split on first '=' only
+      var eqIdx = l.indexOf('=');
+      var rawWord = eqIdx > -1 ? l.slice(0, eqIdx) : l;
+      var hint    = eqIdx > -1 ? l.slice(eqIdx + 1).trim() : '';
+      // Strip leading numbers/bullets: "1. word" "- word" "• word"
+      var word = rawWord
+        .replace(/^\s*[\d]+[\.)\-]\s*/, '')
+        .replace(/^\s*[-\u2022\u2013\u2014*]\s*/, '')
+        .replace(/\s*[\(\[].+[\)\]]\s*$/, '')
+        .replace(/[,;:]+$/, '')
+        .trim();
+      // Multi-word without '=': treat second+ words as hint
+      if (!hint) {
+        var toks = word.split(/\s+/);
+        if (toks.length > 2) { word = toks[0]; hint = toks.slice(1).join(' '); }
+      }
+      return { word: word, hint: hint };
+    }).filter(function (p) { return p.word.length > 0; });
 
     var prompt =
       'You are a vocabulary assistant for Vietnamese EFL learners. ' +
@@ -475,7 +517,7 @@
     if (onProgress) onProgress(0, parsed.length);
 
     return fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' +
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' +
       encodeURIComponent(apiKey),
       {
         method: 'POST',

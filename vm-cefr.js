@@ -230,7 +230,7 @@
       'Words:\n' + toFetch.join('\n');
 
     return fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' +
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' +
       encodeURIComponent(apiKey),
       {
         method: 'POST',
@@ -268,7 +268,7 @@
       'Passage:\n' + text.slice(0, 2000); // limit to 2000 chars
 
     return fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' +
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' +
       encodeURIComponent(apiKey),
       {
         method: 'POST',

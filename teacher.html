@@ -33,17 +33,17 @@
 <div class="vm-modal-bg" id="assignModal">
   <div class="vm-modal" style="max-width:760px">
     <button class="vm-modal-close" id="assignModalClose">✕</button>
-    <div class="vm-modal-title" id="assignModalTitle">📚 Tạo bài tập mới</div>
+    <div class="vm-modal-title" id="assignModalTitle">📚 New Assignment</div>
 
     <!-- Basic info -->
     <div class="asgn-section">
       <div class="vm-row" style="gap:14px;flex-wrap:wrap">
         <div class="vm-field" style="flex:2;min-width:200px">
-          <label class="vm-label">Tên bài tập <span style="color:var(--vm-danger)">*</span></label>
+          <label class="vm-label">Assignment Title <span style="color:var(--vm-danger)">*</span></label>
           <input class="vm-input" id="af-title" placeholder="VD: Unit 5 – Environment Vocabulary">
         </div>
         <div class="vm-field" style="flex:1;min-width:140px">
-          <label class="vm-label">Chế độ <span style="color:var(--vm-danger)">*</span></label>
+          <label class="vm-label">Mode <span style="color:var(--vm-danger)">*</span></label>
           <select class="vm-input" id="af-mode">
             <option value="homework">📝 Homework</option>
             <option value="inclass">🖥️ In-class Review</option>
@@ -52,42 +52,42 @@
       </div>
       <div class="vm-row" style="gap:14px;flex-wrap:wrap">
         <div class="vm-field" style="flex:1;min-width:160px">
-          <label class="vm-label">Lớp được giao <span style="color:var(--vm-danger)">*</span></label>
-          <select class="vm-input" id="af-class"><option value="">-- chọn lớp --</option></select>
+          <label class="vm-label">Assigned Class <span style="color:var(--vm-danger)">*</span></label>
+          <select class="vm-input" id="af-class"><option value="">-- select class --</option></select>
         </div>
         <div class="vm-field" style="flex:1;min-width:140px">
           <label class="vm-label">Start Date</label>
           <input class="vm-input" id="af-start" type="date">
         </div>
         <div class="vm-field" style="flex:1;min-width:140px">
-          <label class="vm-label">Deadline (để trống = không giới hạn)</label>
+          <label class="vm-label">Deadline (leave blank = no limit)</label>
           <input class="vm-input" id="af-deadline" type="date">
         </div>
       </div>
       <div id="af-goals-wrap" class="vm-field">
-        <label class="vm-label">Số lần 100% yêu cầu (Goal)</label>
+        <label class="vm-label">Required Perfect Scores (Goal)</label>
         <input class="vm-input" id="af-goals" type="number" min="1" max="20" value="3" style="max-width:120px">
-        <p style="font-size:.76rem;color:var(--vm-ink-3);margin:4px 0 0">Sinh viên cần đạt 100% đủ số lần này để hoàn thành bài tập.</p>
+        <p style="font-size:.76rem;color:var(--vm-ink-3);margin:4px 0 0">Students must achieve 100% this many times to complete the assignment.</p>
       </div>
     </div>
 
     <!-- Reading passage -->
     <div class="asgn-section">
-      <h3>📖 Reading Passage <span style="font-weight:400;font-size:.82rem;color:var(--vm-ink-3)">(tuỳ chọn — sinh viên đọc trước khi làm quiz)</span></h3>
-      <textarea class="vm-input" id="af-reading" rows="4" placeholder="Dán đoạn văn đọc vào đây. Sinh viên sẽ đọc đoạn này trước khi làm quiz từ vựng…" style="resize:vertical;line-height:1.6"></textarea>
+      <h3>📖 Reading Passage <span style="font-weight:400;font-size:.82rem;color:var(--vm-ink-3)">(optional — students read before the quiz)</span></h3>
+      <textarea class="vm-input" id="af-reading" rows="4" placeholder="Paste the reading passage here. Students read this before the vocabulary quiz…" style="resize:vertical;line-height:1.6"></textarea>
     </div>
 
     <!-- Target vocab -->
     <div class="asgn-section">
-      <h3>📝 Target Vocabulary List <span style="font-weight:400;font-size:.82rem;color:var(--vm-ink-3)">(mỗi dòng 1 từ, hoặc từ = định nghĩa)</span></h3>
+      <h3>📝 Target Vocabulary List <span style="font-weight:400;font-size:.82rem;color:var(--vm-ink-3)">(one word per line, or word = definition)</span></h3>
       <textarea class="vm-input" id="af-vocab-raw" rows="5" placeholder="environment&#10;sustainable = able to be maintained long-term&#10;biodiversity&#10;conservation" style="resize:vertical;font-family:monospace;font-size:.88rem"></textarea>
-      <p style="font-size:.76rem;color:var(--vm-ink-3);margin:6px 0 0">Sau khi nhập, bấm <b>Analyse Vocabulary</b> để AI điền IPA và nghĩa tiếng Việt.</p>
+      <p style="font-size:.76rem;color:var(--vm-ink-3);margin:6px 0 0">After adding words, click <b>Analyse Vocabulary</b> to fill in IPA &amp; Vietnamese meanings.</p>
     </div>
 
     <!-- AI Analysis -->
     <div class="asgn-section-dark">
       <h3>🎓 AI Vocabulary Analysis</h3>
-      <p>AI sẽ điền IPA &amp; Vietnamese cho tất cả từ. Dùng Gemini key (miễn phí) để xử lý đủ 100+ từ.</p>
+      <p>AI will fill IPA &amp; Vietnamese for all words. Use your Gemini key (free) to process 100+ words.</p>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
         <input id="af-gemini-key" type="password" placeholder="••••• (key saved)" style="flex:1;min-width:200px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:9px 12px;color:#fff;font-size:.88rem">
         <button class="vm-btn" id="af-verify-key" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.25);padding:9px 16px;font-size:.84rem;border-radius:8px">✓ Verify</button>
@@ -98,7 +98,7 @@
         <button class="vm-btn vm-btn-ghost" id="af-parse-only" style="background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2);color:#ccc;font-size:.84rem">Parse only (no AI)</button>
       </div>
       <div id="af-ai-progress" style="margin-top:10px;font-size:.8rem;color:#80DFAB;display:none">
-        <span class="vm-spin" style="width:13px;height:13px;margin-right:6px"></span> Đang phân tích từ vựng…
+        <span class="vm-spin" style="width:13px;height:13px;margin-right:6px"></span> Analysing vocabulary…
       </div>
     </div>
 
@@ -135,24 +135,24 @@
 <div class="vm-modal-bg" id="classModal">
   <div class="vm-modal" style="max-width:420px">
     <button class="vm-modal-close" id="classModalClose">✕</button>
-    <div class="vm-modal-title">Tạo lớp mới</div>
+    <div class="vm-modal-title">Create New Class</div>
     <div class="vm-field">
-      <label class="vm-label">Tên lớp <span style="color:var(--vm-danger)">*</span></label>
-      <input class="vm-input" id="cls-name" placeholder="VD: IELTS-A 2025-2026">
+      <label class="vm-label">Class Name <span style="color:var(--vm-danger)">*</span></label>
+      <input class="vm-input" id="cls-name" placeholder="e.g. IELTS-A 2025-2026">
     </div>
     <div class="vm-row">
       <div class="vm-field">
-        <label class="vm-label">Năm học</label>
+        <label class="vm-label">Academic Year</label>
         <input class="vm-input" id="cls-year" placeholder="2025-2026">
       </div>
       <div class="vm-field">
-        <label class="vm-label">Học kỳ</label>
-        <input class="vm-input" id="cls-semester" placeholder="HK1">
+        <label class="vm-label">Semester</label>
+        <input class="vm-input" id="cls-semester" placeholder="Semester 1">
       </div>
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
-      <button class="vm-btn vm-btn-ghost" id="classCancelBtn">Huỷ</button>
-      <button class="vm-btn vm-btn-primary" id="classSaveBtn">Tạo lớp</button>
+      <button class="vm-btn vm-btn-ghost" id="classCancelBtn">Cancel</button>
+      <button class="vm-btn vm-btn-primary" id="classSaveBtn">Create Class</button>
     </div>
   </div>
 </div>
@@ -161,8 +161,8 @@
 <div class="vm-modal-bg" id="rosterModal">
   <div class="vm-modal" style="max-width:600px">
     <button class="vm-modal-close" id="rosterClose">✕</button>
-    <div class="vm-modal-title" id="rosterTitle">Danh sách sinh viên</div>
-    <div id="rosterContent"><div class="vm-empty"><p>Đang tải…</p></div></div>
+    <div class="vm-modal-title" id="rosterTitle">Student Roster</div>
+    <div id="rosterContent"><div class="vm-empty"><p>Loading…</p></div></div>
   </div>
 </div>
 
@@ -194,9 +194,9 @@ var state = {
 function navItems() {
   return [
     { id:'overview', label:'Overview',      icon:'overview' },
-    { id:'classes',  label:'Lớp học',       icon:'classes'  },
-    { id:'assign',   label:'Bài tập',       icon:'assign'   },
-    { id:'results',  label:'Kết quả',       icon:'results'  },
+    { id:'classes',  label:'Classes',       icon:'classes'  },
+    { id:'assign',   label:'Assignments',       icon:'assign'   },
+    { id:'results',  label:'Results',       icon:'results'  },
   ];
 }
 
@@ -210,7 +210,7 @@ VM.renderShell({
 function switchTab(id) {
   state.activeTab = id;
   VM.setActiveNav(id);
-  var titles = { overview:'Overview', classes:'Quản lý lớp', assign:'Bài tập', results:'Kết quả' };
+  var titles = { overview:'Overview', classes:'Classes', assign:'Assignments', results:'Results' };
   VM.setTitle(titles[id] || id);
   var content = document.getElementById('vmContent');
   content.innerHTML = '<div class="vm-empty"><span class="vm-spin-dark" style="width:24px;height:24px;border-width:3px"></span></div>';
@@ -263,15 +263,15 @@ function renderOverview() {
         content.innerHTML =
           '<div id="vmTodaysWord"></div>' +
           '<div class="vm-kpi-row">' +
-            kpi(state.classes.length,'Lớp học','') +
-            kpi(hwCount,'Homework','bài đang mở') +
-            kpi(icCount,'In-class','bài đang mở') +
-            kpi(totalStu,'Học sinh','đã làm bài (14 ngày)') +
+            kpi(state.classes.length,'Classes','') +
+            kpi(hwCount,'Homework','open') +
+            kpi(icCount,'In-class','open') +
+            kpi(totalStu,'Students','active (14 days)') +
           '</div>' +
           '<div style="display:flex;gap:12px;margin-bottom:16px">' +
-            '<button class="vm-btn vm-btn-primary" id="ovNewHw">+ Homework mới</button>' +
-            '<button class="vm-btn vm-btn-ghost" id="ovNewIc">+ In-class mới</button>' +
-            '<button class="vm-btn vm-btn-ghost" id="ovNewCls">+ Tạo lớp</button>' +
+            '<button class="vm-btn vm-btn-primary" id="ovNewHw">+ New Homework</button>' +
+            '<button class="vm-btn vm-btn-ghost" id="ovNewIc">+ New In-class</button>' +
+            '<button class="vm-btn vm-btn-ghost" id="ovNewCls">+ New Class</button>' +
           '</div>' +
           recentResultsTable();
 
@@ -292,10 +292,10 @@ function kpi(val, label, sub) {
 
 function recentResultsTable() {
   var rows = state.results.slice(0,10);
-  if (!rows.length) return '<div class="vm-empty"><p>Chưa có kết quả.</p></div>';
+  if (!rows.length) return '<div class="vm-empty"><p>No results yet.</p></div>';
   return '<div class="vm-table-wrap">' +
     '<table class="vm-table"><thead><tr>' +
-    '<th>Thời gian</th><th>Sinh viên</th><th>Lớp</th><th>Bài tập</th><th>Điểm</th>' +
+    '<th>Time</th><th>Student</th><th>Class</th><th>Assignment</th><th>Score</th>' +
     '</tr></thead><tbody>' +
     rows.map(function(r){
       return '<tr><td>'+VM.esc(VM.fmtDate(r.timestamp))+'</td>' +
@@ -315,12 +315,12 @@ function renderClasses() {
     var content = document.getElementById('vmContent');
     var html =
       '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">' +
-        '<h2 style="margin:0;font-size:1.1rem">Lớp của tôi</h2>' +
-        '<button class="vm-btn vm-btn-primary vm-btn-sm" id="newClassBtn">+ Tạo lớp mới</button>' +
+        '<h2 style="margin:0;font-size:1.1rem">My Classes</h2>' +
+        '<button class="vm-btn vm-btn-primary vm-btn-sm" id="newClassBtn">+ Create New Class</button>' +
       '</div>';
 
     if (!state.classes.length) {
-      html += '<div class="vm-empty"><p>Chưa có lớp nào. Tạo lớp mới để bắt đầu.</p></div>';
+      html += '<div class="vm-empty"><p>No classes yet. Click + New Class to get started.</p></div>';
     } else {
       html += '<div class="vm-classes-grid">' +
         state.classes.map(function(c) {
@@ -329,8 +329,8 @@ function renderClasses() {
             '<div class="vm-class-meta">'+(c.year?c.year:'')+(c.semester?' · '+c.semester:'')+'</div>' +
             '<div class="vm-class-id">'+VM.esc(c.classId)+'</div>' +
             '<div style="margin-top:10px;display:flex;gap:8px">' +
-              '<button class="vm-btn vm-btn-ghost vm-btn-sm" data-roster="'+VM.esc(c.classId)+'">Danh sách</button>' +
-              '<button class="vm-btn vm-btn-ghost vm-btn-sm" data-archive-cls="'+VM.esc(c.classId)+'">Lưu trữ</button>' +
+              '<button class="vm-btn vm-btn-ghost vm-btn-sm" data-roster="'+VM.esc(c.classId)+'">Roster</button>' +
+              '<button class="vm-btn vm-btn-ghost vm-btn-sm" data-archive-cls="'+VM.esc(c.classId)+'">Archive</button>' +
             '</div>' +
           '</div>';
         }).join('') + '</div>';
@@ -344,10 +344,10 @@ function renderClasses() {
     VM.els('[data-archive-cls]').forEach(function(btn){
       btn.onclick = function(){
         var cid = btn.getAttribute('data-archive-cls');
-        if (!confirm('Lưu trữ lớp này? Bài tập và kết quả vẫn còn.')) return;
+        if (!confirm('Archive this class? Assignments and results will be kept.')) return;
         VM.api('class.archive',{classId:cid}).then(function(res){
-          if(res&&res.success){VM.toast('Đã lưu trữ lớp.','ok');renderClasses();}
-          else VM.toast('Lỗi: '+(res&&res.error),'err');
+          if(res&&res.success){VM.toast('Class archived.','ok');renderClasses();}
+          else VM.toast('Error: '+(res&&res.error),'err');
         });
       };
     });
@@ -364,44 +364,44 @@ document.getElementById('classModalClose').onclick = function(){ document.getEle
 document.getElementById('classCancelBtn').onclick  = function(){ document.getElementById('classModal').classList.remove('show'); };
 document.getElementById('classSaveBtn').onclick = function(){
   var name = (document.getElementById('cls-name').value||'').trim();
-  if (!name) { VM.toast('Nhập tên lớp.','err'); return; }
+  if (!name) { VM.toast('Enter class name.','err'); return; }
   VM.api('class.create',{
     className:name, year:document.getElementById('cls-year').value.trim(),
     semester:document.getElementById('cls-semester').value.trim(),
     teacherEmail:sess.email
   }).then(function(res){
     if(res&&res.success){
-      VM.toast('Đã tạo lớp: '+res.data.classId,'ok');
+      VM.toast('Class created: '+res.data.classId,'ok');
       document.getElementById('classModal').classList.remove('show');
       loadClasses(function(){renderClasses();});
-    } else VM.toast('Lỗi: '+(res&&res.error),'err',4000);
+    } else VM.toast('Error: '+(res&&res.error),'err',4000);
   });
 };
 
 function openRoster(classId) {
-  document.getElementById('rosterTitle').textContent = 'Danh sách lớp ' + classId;
-  document.getElementById('rosterContent').innerHTML = '<div class="vm-empty"><p>Đang tải…</p></div>';
+  document.getElementById('rosterTitle').textContent = 'Roster — ' + classId;
+  document.getElementById('rosterContent').innerHTML = '<div class="vm-empty"><p>Loading…</p></div>';
   document.getElementById('rosterModal').classList.add('show');
   VM.api('class.roster',{classId:classId}).then(function(res){
     if (!res || !res.success || !res.data.length) {
-      document.getElementById('rosterContent').innerHTML = '<div class="vm-empty"><p>Lớp chưa có sinh viên.</p></div>';
+      document.getElementById('rosterContent').innerHTML = '<div class="vm-empty"><p>No students in this class yet.</p></div>';
       return;
     }
     document.getElementById('rosterContent').innerHTML =
       '<div class="vm-table-wrap"><table class="vm-table"><thead><tr>' +
-      '<th>Student ID</th><th>Họ và tên</th><th>Email</th><th></th>' +
+      '<th>Student ID</th><th>Name</th><th>Email</th><th></th>' +
       '</tr></thead><tbody>' +
       res.data.map(function(s){
         return '<tr><td>'+VM.esc(s.studentId)+'</td><td>'+VM.esc(s.name)+'</td>' +
                '<td>'+VM.esc(s.email||'—')+'</td>' +
-               '<td><button class="vm-btn vm-btn-ghost vm-btn-sm" data-rmstu="'+VM.esc(s.studentId)+'">Xoá</button></td></tr>';
+               '<td><button class="vm-btn vm-btn-ghost vm-btn-sm" data-rmstu="'+VM.esc(s.studentId)+'">Remove</button></td></tr>';
       }).join('') + '</tbody></table></div>';
     VM.els('[data-rmstu]').forEach(function(btn){
       btn.onclick = function(){
-        if(!confirm('Xoá sinh viên '+btn.getAttribute('data-rmstu')+' khỏi hệ thống?')) return;
+        if(!confirm('Remove student '+btn.getAttribute('data-rmstu')+' from the system?')) return;
         VM.api('student.archive',{studentId:btn.getAttribute('data-rmstu')}).then(function(r){
-          if(r&&r.success){VM.toast('Đã xoá.','ok');openRoster(classId);}
-          else VM.toast('Lỗi.','err');
+          if(r&&r.success){VM.toast('Removed.','ok');openRoster(classId);}
+          else VM.toast('Error.','err');
         });
       };
     });
@@ -416,14 +416,14 @@ function renderAssignments() {
       var content = document.getElementById('vmContent');
       var html =
         '<div class="vm-toolbar">' +
-          '<div class="vm-search">'+VM.icon('search')+'<input id="aFilter" placeholder="Tìm bài tập…"></div>' +
-          '<select class="vm-select" id="aClass"><option value="">Tất cả lớp</option>' +
+          '<div class="vm-search">'+VM.icon('search')+'<input id="aFilter" placeholder="Search assignments…"></div>' +
+          '<select class="vm-select" id="aClass"><option value="">All classes</option>' +
             state.classes.map(function(c){return '<option value="'+VM.esc(c.classId)+'">'+VM.esc(c.className)+'</option>';}).join('') +
           '</select>' +
-          '<select class="vm-select" id="aMode"><option value="">Tất cả mode</option>' +
+          '<select class="vm-select" id="aMode"><option value="">All modes</option>' +
             '<option value="homework">Homework</option><option value="inclass">In-class</option>' +
           '</select>' +
-          '<button class="vm-btn vm-btn-primary" id="newAssignBtn">+ Tạo bài tập</button>' +
+          '<button class="vm-btn vm-btn-primary" id="newAssignBtn">+ New Assignment</button>' +
         '</div>' +
         '<div id="assignList"></div>';
       content.innerHTML = html;
@@ -448,10 +448,10 @@ function renderAssignList() {
     return true;
   });
   var box = document.getElementById('assignList');
-  if (!filtered.length) { box.innerHTML='<div class="vm-empty"><p>Không có bài tập nào.</p></div>'; return; }
+  if (!filtered.length) { box.innerHTML='<div class="vm-empty"><p>No assignments found.</p></div>'; return; }
 
   box.innerHTML = '<div class="vm-table-wrap"><table class="vm-table"><thead><tr>' +
-    '<th>Tên bài</th><th>Lớp</th><th>Mode</th><th>Deadline</th><th>Goal</th><th>Từ</th><th>Action</th>' +
+    '<th>Title</th><th>Class</th><th>Mode</th><th>Deadline</th><th>Goal</th><th>Words</th><th>Action</th>' +
     '</tr></thead><tbody>' +
     filtered.map(function(a){
       var modeLabel = a.mode==='homework'?'📝 Homework':'🖥️ In-class';
@@ -473,10 +473,10 @@ function renderAssignList() {
   });
   VM.els('[data-del-asgn]').forEach(function(btn){
     btn.onclick = function(){
-      if(!confirm('Xoá bài tập này?')) return;
+      if(!confirm('Delete this assignment?')) return;
       VM.api('assign.delete',{assignmentId:btn.getAttribute('data-del-asgn')}).then(function(r){
-        if(r&&r.success){VM.toast('Đã xoá.','ok');loadAssignments(renderAssignList);}
-        else VM.toast('Lỗi.','err');
+        if(r&&r.success){VM.toast('Deleted.','ok');loadAssignments(renderAssignList);}
+        else VM.toast('Error.','err');
       });
     };
   });
@@ -485,7 +485,7 @@ function renderAssignList() {
 // ── Assignment Modal ───────────────────────────────────────────────
 function populateClassSelect() {
   var sel = document.getElementById('af-class');
-  sel.innerHTML = '<option value="">-- chọn lớp --</option>' +
+  sel.innerHTML = '<option value="">-- select class --</option>' +
     state.classes.map(function(c){
       return '<option value="'+VM.esc(c.classId)+'">'+VM.esc(c.className)+' ('+VM.esc(c.classId)+')</option>';
     }).join('');
@@ -494,7 +494,7 @@ function populateClassSelect() {
 function openAssignModal(asgn, defaultMode) {
   state.editingAssignId = asgn ? asgn.assignmentId : null;
   state.vocabRows = [];
-  document.getElementById('assignModalTitle').textContent = asgn ? '✏️ Chỉnh sửa bài tập' : '📚 Tạo bài tập mới';
+  document.getElementById('assignModalTitle').textContent = asgn ? '✏️ Edit Assignment' : '📚 New Assignment';
 
   if (!state.classes.length) {
     loadClasses(function(){ populateClassSelect(); });
@@ -542,25 +542,25 @@ function closeAssignModal(){ document.getElementById('assignModal').classList.re
 // Gemini key verify
 document.getElementById('af-verify-key').onclick = function(){
   var raw = document.getElementById('af-gemini-key').value.trim();
-  if (!raw || raw === '••••• (key saved)') { VM.toast('Nhập API key.','warn'); return; }
+  if (!raw || raw === '••••• (key saved)') { VM.toast('Enter API key.','warn'); return; }
   VM.geminiKey.set(raw);
-  document.getElementById('af-key-status').textContent = '⏳ Đang kiểm tra…';
+  document.getElementById('af-key-status').textContent = '⏳ Verifying…';
   fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key='+encodeURIComponent(raw),{
     method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({contents:[{parts:[{text:'Say "ok" only'}]}],generationConfig:{maxOutputTokens:5}})
   }).then(function(r){return r.json();}).then(function(){
     document.getElementById('af-key-status').textContent='✅ Gemini key active — will process ALL words';
-    VM.toast('Key hợp lệ!','ok');
+    VM.toast('Key verified!','ok');
   }).catch(function(){
-    document.getElementById('af-key-status').textContent='❌ Key không hợp lệ.';
-    VM.toast('Key không hợp lệ.','err');
+    document.getElementById('af-key-status').textContent='❌ Invalid key.';
+    VM.toast('Invalid key.','err');
   });
 };
 
 // Parse only (no AI)
 document.getElementById('af-parse-only').onclick = function(){
   var raw = document.getElementById('af-vocab-raw').value;
-  if (!raw.trim()) { VM.toast('Nhập danh sách từ trước.','warn'); return; }
+  if (!raw.trim()) { VM.toast('Enter word list first.','warn'); return; }
   var lines = raw.split('\n').filter(function(l){return l.trim();});
   state.vocabRows = lines.map(function(l){
     var parts = l.split('=');
@@ -569,17 +569,17 @@ document.getElementById('af-parse-only').onclick = function(){
     return { word:word, ipa:'', synonyms:syns, vi:'' };
   });
   renderVocabTable();
-  VM.toast('Đã tách '+state.vocabRows.length+' từ.','ok');
+  VM.toast('Parsed '+state.vocabRows.length+' words.','ok');
 };
 
 // Analyze with AI
 document.getElementById('af-analyze').onclick = function(){
   var raw = document.getElementById('af-vocab-raw').value;
-  if (!raw.trim()) { VM.toast('Nhập danh sách từ trước.','warn'); return; }
+  if (!raw.trim()) { VM.toast('Enter word list first.','warn'); return; }
   var key = VM.geminiKey.get();
   if (!key) {
     var typed = document.getElementById('af-gemini-key').value.trim();
-    if (!typed || typed === '••••• (key saved)') { VM.toast('Nhập Gemini API key.','warn'); return; }
+    if (!typed || typed === '••••• (key saved)') { VM.toast('Enter Gemini API key.','warn'); return; }
     key = typed; VM.geminiKey.set(typed);
   }
   document.getElementById('af-ai-progress').style.display='';
@@ -589,11 +589,11 @@ document.getElementById('af-analyze').onclick = function(){
     renderVocabTable();
     document.getElementById('af-ai-progress').style.display='none';
     document.getElementById('af-analyze').disabled=false;
-    VM.toast('Phân tích xong '+rows.length+' từ!','ok');
+    VM.toast('Analysed '+rows.length+' words!','ok');
   }).catch(function(err){
     document.getElementById('af-ai-progress').style.display='none';
     document.getElementById('af-analyze').disabled=false;
-    VM.toast('Lỗi AI: '+err.message,'err',5000);
+    VM.toast('AI error: '+err.message,'err',5000);
   });
 };
 
@@ -612,9 +612,9 @@ function renderVocabTable(){
   tbody.innerHTML = state.vocabRows.map(function(r,i){
     return '<tr>' +
       '<td><input value="'+VM.esc(r.word)+'" data-vi="'+i+'" data-field="word"></td>' +
-      '<td><input value="'+VM.esc(r.ipa||'')+'" data-vi="'+i+'" data-field="ipa" placeholder="/ɪkˈzeɪm.pəl/"></td>' +
+      '<td><input value="'+VM.esc(r.ipa||'')+'" data-vi="'+i+'" data-field="ipa" placeholder="/ˈpəʊ.lər/"></td>' +
       '<td><input value="'+VM.esc((r.synonyms||[]).join(', '))+'" data-vi="'+i+'" data-field="synonyms" placeholder="synonym1, synonym2"></td>' +
-      '<td><input value="'+VM.esc(r.vi||r.meaningVi||'')+'" data-vi="'+i+'" data-field="vi" placeholder="nghĩa tiếng Việt"></td>' +
+      '<td><input value="'+VM.esc(r.vi||r.meaningVi||'')+'" data-vi="'+i+'" data-field="vi" placeholder="Vietnamese meaning"></td>' +
       '<td><button class="vm-vocab-del" data-del="'+i+'">✕</button></td>' +
     '</tr>';
   }).join('');
@@ -640,9 +640,9 @@ document.getElementById('assignSave').onclick = function(){
   var title = document.getElementById('af-title').value.trim();
   var classId = document.getElementById('af-class').value;
   var mode = document.getElementById('af-mode').value;
-  if (!title) { VM.toast('Nhập tên bài tập.','err'); return; }
-  if (!classId) { VM.toast('Chọn lớp.','err'); return; }
-  if (!state.vocabRows.length) { VM.toast('Cần ít nhất 1 từ.','err'); return; }
+  if (!title) { VM.toast('Enter assignment title.','err'); return; }
+  if (!classId) { VM.toast('Select a class.','err'); return; }
+  if (!state.vocabRows.length) { VM.toast('Add at least 1 word.','err'); return; }
 
   // Sync any unsaved input changes
   document.querySelectorAll('#af-vocab-tbody input[data-field]').forEach(function(inp){
@@ -671,11 +671,11 @@ document.getElementById('assignSave').onclick = function(){
   VM.api(action, payload).then(function(res){
     document.getElementById('assignSave').disabled = false;
     if(res&&res.success){
-      VM.toast(state.editingAssignId?'Đã cập nhật bài tập.':'Đã giao bài tập!','ok');
+      VM.toast(state.editingAssignId?'Assignment updated.':'Assignment saved!','ok');
       closeAssignModal();
       loadAssignments(function(){ if(state.activeTab==='assign') renderAssignList(); });
-    } else VM.toast('Lỗi: '+(res&&res.error),'err',5000);
-  }).catch(function(){ document.getElementById('assignSave').disabled=false; VM.toast('Lỗi kết nối.','err'); });
+    } else VM.toast('Error: '+(res&&res.error),'err',5000);
+  }).catch(function(){ document.getElementById('assignSave').disabled=false; VM.toast('Connection error.','err'); });
 };
 
 // ── Results tab ────────────────────────────────────────────────────
@@ -695,20 +695,20 @@ function _renderResultsUI() {
 
   content.innerHTML =
     '<div class="vm-toolbar">' +
-      '<div class="vm-search">'+VM.icon('search')+'<input id="rSearch" placeholder="Tìm tên, Student ID…"></div>' +
-      '<select class="vm-select" id="rClass"><option value="">Tất cả lớp</option>' +
+      '<div class="vm-search">'+VM.icon('search')+'<input id="rSearch" placeholder="Search name, Student ID…"></div>' +
+      '<select class="vm-select" id="rClass"><option value="">All classes</option>' +
         state.classes.map(function(c){return '<option value="'+VM.esc(c.classId)+'">'+VM.esc(c.className)+'</option>';}).join('') +
       '</select>' +
-      '<select class="vm-select" id="rAssign"><option value="">Tất cả bài tập</option>' +
+      '<select class="vm-select" id="rAssign"><option value="">All assignments</option>' +
         assignments.map(function(a){return '<option value="'+VM.esc(a.assignmentId)+'">'+VM.esc(a.title)+'</option>';}).join('') +
       '</select>' +
-      '<select class="vm-select" id="rMode"><option value="">Tất cả mode</option>' +
+      '<select class="vm-select" id="rMode"><option value="">All modes</option>' +
         '<option value="homework">Homework</option><option value="inclass">In-class</option>' +
       '</select>' +
       '<div class="vm-period-note">' +
         (state.resultsFull
-          ? '<span>📅 Toàn bộ dữ liệu</span><button class="vm-btn vm-btn-ghost vm-btn-sm" id="rTogglePeriod">14 ngày gần nhất</button>'
-          : '<span>📅 14 ngày gần nhất</span><button class="vm-btn vm-btn-ghost vm-btn-sm" id="rTogglePeriod">Xem toàn bộ</button>') +
+          ? '<span>📅 All data</span><button class="vm-btn vm-btn-ghost vm-btn-sm" id="rTogglePeriod">Last 14 days</button>'
+          : '<span>📅 Last 14 days</span><button class="vm-btn vm-btn-ghost vm-btn-sm" id="rTogglePeriod">View all</button>') +
       '</div>' +
     '</div>' +
     '<div id="rTableWrap"></div>';
@@ -763,21 +763,21 @@ function _renderResultsUI() {
     });
 
     var cols = [
-      {key:'timestamp', label:'Thời gian'},
+      {key:'timestamp', label:'Time'},
       {key:'studentId', label:'Student ID'},
-      {key:'name',      label:'Tên'},
-      {key:'class',     label:'Lớp'},
-      {key:'title',     label:'Bài tập'},
+      {key:'name',      label:'Name'},
+      {key:'class',     label:'Class'},
+      {key:'title',     label:'Assignments'},
       {key:'mode',      label:'Mode'},
-      {key:'score',     label:'Điểm'},
-      {key:'correct',   label:'Đúng/Tổng'},
-      {key:'durationSec',label:'Thời gian'},
+      {key:'score',     label:'Score'},
+      {key:'correct',   label:'Correct/Total'},
+      {key:'durationSec',label:'Duration'},
       {key:'attempts',  label:'Attempts'},
       {key:'goals',     label:'Goals'},
     ];
 
     wrap.innerHTML =
-      (total?'<div style="font-size:.8rem;color:var(--vm-ink-3);margin-bottom:8px">'+total+' kết quả</div>':'') +
+      (total?'<div style="font-size:.8rem;color:var(--vm-ink-3);margin-bottom:8px">'+total+' results</div>':'') +
       '<div class="vm-table-wrap"><table class="vm-table"><thead><tr>' +
         cols.slice(0,9).map(function(c){
           var cls2 = 'sortable';
@@ -811,7 +811,7 @@ function _renderResultsUI() {
           '<td>'+attemptRows+'</td>' +
           '<td>'+goalChip+'</td>' +
         '</tr>';
-      }).join('') : '<tr><td colspan="11" style="text-align:center;padding:32px;color:var(--vm-ink-3)">Không có dữ liệu trong khoảng thời gian này.</td></tr>') +
+      }).join('') : '<tr><td colspan="11" style="text-align:center;padding:32px;color:var(--vm-ink-3)">No data for this period.</td></tr>') +
       '</tbody></table></div>' +
       renderPager(total);
 
