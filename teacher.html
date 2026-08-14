@@ -196,6 +196,7 @@ var state = {
   assignments: [],
   results: [],
   resultsFull: false,
+  recheckMap: {},
   activeTab: 'overview',
   filterClass: '',
   filterMode: '',
@@ -848,44 +849,66 @@ function _renderResultsUI() {
   function renderTable(){
     var rows = sortRows(filter());
     var total= rows.length;
-    var start= (page-1)*PAGE, end=Math.min(start+PAGE,total);
-    var slice= rows.slice(start,end);
+    var start= (page-1)*PAGE, endR=Math.min(start+PAGE,total);
+    var slice= rows.slice(start,endR);
     var wrap = document.getElementById('rTableWrap');
 
-    // Build goal-per-assignment map for homework
-    var goalMap = {}; // assignmentId -> requiredGoals
+    // Determine if viewing inclass (all filtered rows are inclass)
+    var filterMode = (document.getElementById('rMode')||{}).value||'';
+    var filterAssign = (document.getElementById('rAssign')||{}).value||'';
+    var showInclass = filterMode==='inclass' || (filterAssign && (function(){
+      var a=assignments.find(function(x){return x.assignmentId===filterAssign;});
+      return a&&a.mode==='inclass';
+    })());
+
+    // Homework goal maps
+    var goalMap = {};
     assignments.forEach(function(a){ goalMap[a.assignmentId]=a.requiredGoals||3; });
-    // Aggregate perfect counts per student per assignment (from all loaded results)
-    var perfectMap = {}; // studentId+assignId -> perfectCount
+    var perfectMap = {};
     state.results.forEach(function(r){
       if(r.mode!=='homework') return;
       var k = r.studentId+'__'+r.assignmentId;
       perfectMap[k] = (perfectMap[k]||0) + (r.isPerfect?1:0);
     });
 
-    var cols = [
-      {key:'timestamp', label:'Time'},
-      {key:'studentId', label:'Student ID'},
-      {key:'name',      label:'Name'},
-      {key:'class',     label:'Class'},
-      {key:'title',     label:'Assignments'},
-      {key:'mode',      label:'Mode'},
-      {key:'score',     label:'Score'},
-      {key:'correct',   label:'Correct/Total'},
-      {key:'durationSec',label:'Duration'},
-      {key:'attempts',  label:'Attempts'},
-      {key:'goals',     label:'Goals'},
+    // Recheck map (loaded async, stored in state.recheckMap)
+    var recheckMap = state.recheckMap || {};
+
+    var baseCols = [
+      {key:'timestamp',  label:'Time',            sortable:true},
+      {key:'studentId',  label:'Student ID',      sortable:true},
+      {key:'name',       label:'Name',             sortable:true},
+      {key:'class',      label:'Class',            sortable:true},
+      {key:'title',      label:'Assignment',       sortable:true},
+      {key:'mode',       label:'Mode',             sortable:false},
+      {key:'score',      label:'Score',            sortable:true},
+      {key:'correct',    label:'Correct/Total',    sortable:false},
+      {key:'durationSec',label:'Duration',         sortable:true},
+      {key:'attempts',   label:'Attempts',         sortable:false},
+      {key:'goals',      label:'Goals',            sortable:false},
     ];
+    var icCols = [
+      {key:'missedWords',label:'Missed Words',     sortable:false},
+      {key:'absent',     label:'Status',           sortable:false},
+      {key:'recheck',    label:'Re-check ✓',  sortable:false},
+    ];
+    var activeCols = showInclass ? baseCols.concat(icCols) : baseCols;
+    var colSpan = activeCols.length;
 
     wrap.innerHTML =
       (total?'<div style="font-size:.8rem;color:var(--vm-ink-3);margin-bottom:8px">'+total+' results</div>':'') +
-      '<div class="vm-table-wrap"><table class="vm-table"><thead><tr>' +
-        cols.slice(0,9).map(function(c){
+      (showInclass?
+        '<div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">'+
+          '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="rMarkAbsent">Mark Absent (close session)</button>'+
+          '<span style="font-size:.76rem;color:var(--vm-ink-3)">Marks non-submitted students as absent with all class missed words</span>'+
+        '</div>':'') +
+      '<div class="vm-table-wrap" style="overflow-x:auto"><table class="vm-table"><thead><tr>' +
+        activeCols.map(function(c){
+          if(!c.sortable) return '<th>'+VM.esc(c.label)+'</th>';
           var cls2 = 'sortable';
           if(sortState.col===c.key) cls2+=' sort-'+(sortState.dir==='asc'?'asc':'desc');
           return '<th class="'+cls2+'" data-sortcol="'+c.key+'">'+VM.esc(c.label)+'<span class="sa"></span></th>';
         }).join('') +
-        '<th>Attempts</th><th>Goals</th>' +
       '</tr></thead><tbody>' +
       (slice.length ? slice.map(function(r){
         var pKey = r.studentId+'__'+r.assignmentId;
@@ -894,28 +917,73 @@ function _renderResultsUI() {
         var attemptRows = state.results.filter(function(x){return x.studentId===r.studentId&&x.assignmentId===r.assignmentId;}).length;
 
         var goalChip = '';
-        if (r.mode==='homework') {
-          var cls2 = perfCount>=reqGoal ? (perfCount>reqGoal?'over':'met') : (perfCount>0?'partial':'none');
-          goalChip = '<span class="vm-goal '+cls2+'">'+perfCount+'/'+reqGoal+'</span>';
+        if(r.mode==='homework'){
+          var gc = perfCount>=reqGoal?(perfCount>reqGoal?'over':'met'):(perfCount>0?'partial':'none');
+          goalChip = '<span class="vm-goal '+gc+'">'+perfCount+'/'+reqGoal+'</span>';
         } else { goalChip='—'; }
 
+        // In-class extras
+        var missedCell='', statusCell='', recheckCell='';
+        if(showInclass){
+          // Missed words
+          var mw=[];
+          try{ mw=JSON.parse(r.missedWords||'[]'); }catch(e){ mw=String(r.missedWords||'').split(',').filter(Boolean); }
+          var mwColor = mw.length===0?'var(--vm-ok)':(mw.length<=3?'#A66B00':'var(--vm-danger)');
+          missedCell='<td style="max-width:220px">'+
+            (mw.length?'<div style="display:flex;flex-wrap:wrap;gap:3px">'+
+              mw.map(function(w){return'<span style="background:#FEF3D6;color:#7A5000;border-radius:4px;padding:1px 6px;font-size:.72rem;font-weight:600">'+VM.esc(w)+'</span>';}).join('')+
+            '</div>':'<span style="color:var(--vm-ok);font-size:.8rem">✓ No missed</span>')+
+          '</td>';
+
+          // Status
+          var statusLabel, statusColor;
+          if(r.absent==='TRUE'||r.absent===true){
+            statusLabel='⚠️ Absent'; statusColor='var(--vm-danger)';
+          } else if(r.timedOut==='TRUE'||r.timedOut===true){
+            statusLabel='⏰ Timed out'; statusColor='#A66B00';
+          } else {
+            statusLabel='✓ Submitted'; statusColor='var(--vm-ok)';
+          }
+          statusCell='<td><span style="color:'+statusColor+';font-size:.8rem;font-weight:600">'+statusLabel+'</span></td>';
+
+          // Recheck
+          var rc=recheckMap[String(r.studentId).trim()+'__'+String(r.assignmentId)];
+          var isChecked=!!(rc&&rc.checkedAt);
+          recheckCell='<td style="text-align:center">'+
+            '<label style="cursor:pointer;display:flex;align-items:center;gap:5px;justify-content:center">'+
+              '<input type="checkbox" class="rw-recheck-cb" '+
+                'data-sid="'+VM.esc(String(r.studentId))+'" '+
+                'data-aid="'+VM.esc(String(r.assignmentId))+'" '+
+                'data-title="'+VM.esc(r.title||'')+'" '+
+                'data-sname="'+VM.esc(r.name||'')+'" '+
+                'data-cls="'+VM.esc(r.class||'')+'" '+
+                'data-mw="'+VM.esc(JSON.stringify(mw))+'" '+
+                'data-ptype="'+(r.absent==='TRUE'?'absent':(r.timedOut==='TRUE'?'timeout':'wrong'))+'" '+
+                (isChecked?'checked':'')+'>'+
+              (isChecked?'<span style="font-size:.72rem;color:var(--vm-ok)">'+VM.esc(rc.checkedAt.slice(0,10))+'</span>':'<span style="font-size:.72rem;color:var(--vm-ink-3)">Pending</span>')+
+            '</label>'+
+          '</td>';
+        }
+
         return '<tr>' +
-          '<td>'+VM.esc(VM.fmtDate(r.timestamp))+'</td>' +
+          '<td style="font-size:.8rem">'+VM.esc(VM.fmtDate(r.timestamp))+'</td>' +
           '<td>'+VM.esc(r.studentId)+'</td>' +
           '<td>'+VM.esc(r.name)+'</td>' +
           '<td>'+VM.esc(r.class)+'</td>' +
-          '<td>'+VM.esc(r.title||r.assignmentId)+'</td>' +
+          '<td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+VM.esc(r.title||r.assignmentId)+'">'+VM.esc(r.title||r.assignmentId)+'</td>' +
           '<td>'+(r.mode==='homework'?'📝':'🖥️')+' '+VM.esc(r.mode||'')+'</td>' +
           '<td class="vm-score '+scoreClass(r.score)+'">'+r.score+'%</td>' +
           '<td>'+VM.esc(r.correct+'/'+r.total)+'</td>' +
           '<td>'+VM.fmtDuration(r.durationSec)+'</td>' +
           '<td>'+attemptRows+'</td>' +
           '<td>'+goalChip+'</td>' +
+          missedCell + statusCell + recheckCell +
         '</tr>';
-      }).join('') : '<tr><td colspan="11" style="text-align:center;padding:32px;color:var(--vm-ink-3)">No data for this period.</td></tr>') +
+      }).join('') : '<tr><td colspan="'+colSpan+'" style="text-align:center;padding:32px;color:var(--vm-ink-3)">No data for this period.</td></tr>') +
       '</tbody></table></div>' +
       renderPager(total);
 
+    // Sort handlers
     wrap.querySelectorAll('[data-sortcol]').forEach(function(th){
       th.onclick=function(){
         var col=th.getAttribute('data-sortcol');
@@ -927,6 +995,54 @@ function _renderResultsUI() {
     wrap.querySelectorAll('.vm-page-btn').forEach(function(btn){
       btn.onclick=function(){var p=parseInt(btn.getAttribute('data-page'),10);if(!isNaN(p)){page=p;renderTable();}};
     });
+
+    // Recheck checkbox handlers
+    wrap.querySelectorAll('.rw-recheck-cb').forEach(function(cb){
+      cb.onchange=function(){
+        if(!cb.checked){return;}  // only handle checking, not unchecking
+        var sid=cb.getAttribute('data-sid'),aid=cb.getAttribute('data-aid');
+        var mw=[]; try{mw=JSON.parse(cb.getAttribute('data-mw')||'[]');}catch(e){}
+        showOverlay('Saving recheck…');
+        VM.api('result.recheckSave',{
+          assignmentId:aid, title:cb.getAttribute('data-title')||'',
+          studentId:sid, studentName:cb.getAttribute('data-sname')||'',
+          class:cb.getAttribute('data-cls')||'',
+          missedWords:mw.join(', '),
+          penaltyType:cb.getAttribute('data-ptype')||'wrong',
+          teacherEmail:sess.email,
+          note:''
+        }).then(function(res){
+          hideOverlay();
+          if(res&&res.success){
+            VM.toast('Re-check saved.','ok');
+            // Update local recheckMap
+            state.recheckMap = state.recheckMap||{};
+            state.recheckMap[sid+'__'+aid]={checkedAt:new Date().toISOString().slice(0,10),checkedBy:sess.email};
+            renderTable();
+          } else VM.toast('Error: '+(res&&res.error),'err');
+        }).catch(function(){hideOverlay();VM.toast('Connection error.','err');});
+      };
+    });
+
+    // Mark Absent button
+    var mab=document.getElementById('rMarkAbsent');
+    if(mab) mab.onclick=function(){
+      var aid=filterAssign;
+      if(!aid){VM.toast('Filter by a specific In-class assignment first.','warn');return;}
+      var a=assignments.find(function(x){return x.assignmentId===aid;});
+      if(!a){VM.toast('Assignment not found.','err');return;}
+      if(!confirm('Mark all non-submitted students as Absent? This will assign them all missed words from the class session.')) return;
+      showOverlay('Recording absences…');
+      VM.api('result.absentPenalty',{
+        assignmentId:aid, classId:a.classId, title:a.title||'', total:a.vocab?a.vocab.length:0
+      }).then(function(res){
+        hideOverlay();
+        if(res&&res.success){
+          VM.toast(res.data.absentCount+' absent student(s) recorded.','ok');
+          renderResults(state.resultsFull);
+        } else VM.toast('Error: '+(res&&res.error),'err');
+      }).catch(function(){hideOverlay();VM.toast('Connection error.','err');});
+    };
   }
 
   function renderPager(total){

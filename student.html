@@ -167,7 +167,11 @@ function switchTab(id){
   else if(id==='homework') renderAssignList('homework');
   else if(id==='inclass')  renderAssignList('inclass');
   else if(id==='reading')  renderReadWise();
-  else if(id==='history')  renderHistory();
+  else if(id==='history'){
+    // Pre-load assignments so retry buttons work
+    if(!S.assignments.length) loadAssignments(function(){ renderHistory(); });
+    else renderHistory();
+  }
 }
 
 function loadAssignments(cb){
@@ -467,7 +471,11 @@ function bindQuizInput(q,isFITB){
     }
     if(fb){fb.className='vm-quiz-fb '+(res.correct?'ok':'bad');
            fb.textContent=res.correct?'✓ Correct!':'✗ Answer: '+q.correct;}
-    if(res.correct) S.quizState.correct++;
+    if(res.correct) { S.quizState.correct++; }
+    else {
+      S.quizState.wrongAnswers = S.quizState.wrongAnswers||{};
+      S.quizState.wrongAnswers[S.quizState.qIdx] = true;
+    }
     setTimeout(function(){
       S.quizState.qIdx++;
       if(S.quizState.qIdx>=S.quiz.total) showResult();
@@ -501,10 +509,24 @@ function showResult(){
   var score=Math.round(qs.correct/total*100),isPerfect=score===100,dur=Math.round((Date.now()-qs.startTs)/1000);
   var asgn=qs.asgn;
   showOverlay('Saving result…');
-  VM.api('result.save',{
+  // Collect missed words from quiz state (words answered wrong or not reached)
+  var missedWords = [];
+  if(asgn.mode==='inclass' && S.quiz && S.quiz.questions){
+    S.quiz.questions.forEach(function(q,i){
+      var r2=S.quizState.wrongAnswers||{};
+      // Wrong if answered wrong, or if qIdx stopped before this question
+      if(i>=qs.qIdx || r2[i]===true) {
+        if(missedWords.indexOf(q.word)<0) missedWords.push(q.word);
+      }
+    });
+  }
+  var apiAction = asgn.mode==='inclass' ? 'result.saveInclass' : 'result.save';
+  VM.api(apiAction,{
     studentId:sess.studentId,name:sess.name,class:sess.class||asgn.classId,
     assignmentId:asgn.assignmentId,title:asgn.title,mode:asgn.mode,
-    score:score,isPerfect:isPerfect,durationSec:dur,correct:qs.correct,total:total
+    score:score,isPerfect:isPerfect,durationSec:dur,correct:qs.correct,total:total,
+    missedWords:missedWords,
+    timedOut:!!(qs.timedOut),
   }).then(function(r){
     hideOverlay();
     if(r&&r.success) loadMyResults(function(){});
@@ -536,8 +558,14 @@ function showResult(){
         '<button class="vm-btn vm-btn-ghost" id="backRes" style="padding:11px 20px">← Back</button>'+
       '</div>'+
     '</div>';
-  document.getElementById('tryAgain').onclick=function(){startQuiz(asgn);};
-  document.getElementById('backRes').onclick=function(){switchTab(S.activeTab);};
+  document.getElementById('tryAgain').onclick=function(){
+    if(asgn.mode==='readwise' && _currentRWArticle) openRWQuiz(_currentRWArticle);
+    else startQuiz(asgn);
+  };
+  document.getElementById('backRes').onclick=function(){
+    if(asgn.mode==='readwise' && _currentRWArticle) renderRWReader(_currentRWArticle);
+    else switchTab(S.activeTab);
+  };
 }
 function bdg(v,l){
   return '<div class="vm-result-badge"><div class="val">'+VM.esc(String(v))+'</div><div class="lbl">'+VM.esc(l)+'</div></div>';
@@ -569,211 +597,371 @@ function showCEFRTip(anchor,word,level,mData){
   },10);
 }
 
-/* ── ReadWise (self-directed, independent of assignments) ─── */
-// ReadWise uses a separate vocab sheet tab — students pick their own articles.
-// For now we source articles from assignments that have reading passages,
-// but present them as independent reading material (not tied to homework grades).
-// Results saved under mode:'readwise' — teacher sees date/time/quiz scores.
-var RW_VOCAB_COUNT = 60;   // always pull 60 vocab words
-var RW_COMP_COUNT  = 15;   // always 15 comprehension questions
+/* ── ReadWise — self-directed study ──────────────────────────── */
+var RW_GEMINI_KEY_STORE = 'vm_rw_gemini';
+var _rwArticles = [];
+
+function getRWKey(){ return localStorage.getItem(RW_GEMINI_KEY_STORE)||''; }
+function setRWKey(k){ localStorage.setItem(RW_GEMINI_KEY_STORE, k||''); }
 
 function renderReadWise(){
   showOverlay('Loading ReadWise…');
-  VM.api('assign.forStudent',{classId:sess.class}).then(function(res){
+  VM.api('readwise.list',{studentId:sess.studentId}).then(function(res){
     hideOverlay();
+    _rwArticles = (res&&res.success?res.data:[]);
     var c=document.getElementById('vmContent');
-    var articles=(res&&res.success?res.data||[]:S.assignments).filter(function(a){return a.reading&&a.reading.trim();});
-
-    // Stats from readwise history
-    var rwRes=S.myResults.filter(function(r){return r.mode==='readwise';});
-    var totalRead=new Set(rwRes.map(function(r){return r.assignmentId;})).size;
-    var avgScore=rwRes.length?Math.round(rwRes.reduce(function(s,r){return s+parseFloat(r.score||0);},0)/rwRes.length):0;
-
-    if(!articles.length){
-      c.innerHTML=
-        '<div class="rw-stats-row">'+
-          rwStat(totalRead,'Articles read')+rwStat(avgScore+'%','Avg. score')+
-        '</div>'+
-        '<div class="vm-empty"><p>No reading articles available yet. Your teacher will add them.</p></div>';
-      return;
-    }
+    var savedKey=getRWKey();
 
     c.innerHTML=
-      '<div class="rw-stats-row">'+
-        rwStat(totalRead,'Articles read')+rwStat(avgScore+'%','Avg. score')+
+      // ── Create form ──
+      '<div style="background:var(--vm-surface);border:1px solid var(--vm-border-2);border-radius:var(--vm-r);padding:24px 26px;margin-bottom:20px">'+
+
+        // Title
+        '<div class="vm-field">'+
+          '<label class="vm-label" style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--vm-ink-2)">'+
+            '📌 TIÊU ĐỀ BÀI ĐỌC <span style="color:var(--vm-danger)">*</span>'+
+          '</label>'+
+          '<input class="vm-input" id="rwTitle" placeholder="Vd: The largest Roman villa in Britain">'+
+        '</div>'+
+
+        // Passage
+        '<div class="vm-field">'+
+          '<label class="vm-label" style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--vm-ink-2)">'+
+            '📄 NỘI DUNG BÀI ĐỌC <span style="color:var(--vm-danger)">*</span>'+
+            ' <span style="font-weight:400;color:var(--vm-ink-3)">— tối thiểu 100 từ</span>'+
+          '</label>'+
+          '<textarea class="vm-input" id="rwPassageTa" rows="10" '+
+            'placeholder="Dán bài đọc tiếng Anh vào đây…" '+
+            'style="resize:vertical;line-height:1.65;font-size:.93rem" '+
+            'oninput="document.getElementById(\'rwWC\').textContent=this.value.trim().split(/\\s+/).filter(Boolean).length+\' từ\'">'+
+          '</textarea>'+
+          '<div id="rwWC" style="font-size:.76rem;color:var(--vm-ink-3);margin-top:4px">0 từ</div>'+
+        '</div>'+
+
+        // Gemini key
+        '<div class="vm-field">'+
+          '<label class="vm-label" style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--vm-ink-2)">'+
+            '🔑 GEMINI API KEY <span style="color:var(--vm-danger)">*</span>'+
+          '</label>'+
+          '<input class="vm-input" id="rwGemKey" type="password" '+
+            'placeholder="AIza…" value="'+VM.esc(savedKey)+'" '+
+            'style="font-family:monospace">'+
+          '<p style="font-size:.75rem;color:var(--vm-ink-3);margin:5px 0 0">'+
+            'Dùng để dịch nghĩa, trích cụm từ và tạo quiz — <b>chỉ tốn 1 lần cho mỗi bài</b>, sau đó lưu lại dùng mãi. '+
+            '<a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--vm-primary)">Lấy key miễn phí →</a>'+
+          '</p>'+
+        '</div>'+
+
+        '<button class="vm-btn vm-btn-danger" id="rwAnalyseBtn" style="padding:11px 24px;font-size:.95rem">'+
+          '🚀 Phân tích bài đọc'+
+        '</button>'+
+        '<div id="rwAnalyseStatus" style="margin-top:10px;font-size:.82rem;color:var(--vm-ink-3);min-height:18px"></div>'+
       '</div>'+
-      '<h3 style="font-family:var(--vm-font-display);margin:0 0 14px;font-size:1rem">📚 Available Articles</h3>'+
-      '<div class="rw-article-grid">'+
-        articles.map(function(a){
-          var myRW=rwRes.filter(function(r){return r.assignmentId===a.assignmentId;});
-          var attempts=myRW.length;
-          var bestScore=attempts?Math.max.apply(null,myRW.map(function(r){return parseFloat(r.score||0);})):null;
-          return '<div class="rw-article-card" data-rw-open="'+VM.esc(a.assignmentId)+'">'+
-            '<div class="rw-article-title">'+VM.esc(a.title)+'</div>'+
-            '<div class="rw-article-meta">'+
-              '<span>📖 Reading</span>'+
-              '<span>📚 '+(a.vocab||[]).length+' words</span>'+
-              (attempts?'<span>✓ '+attempts+' attempt(s) · Best: '+bestScore+'%</span>':'<span>Not started</span>')+
-            '</div>'+
-            '<button class="vm-btn '+(attempts?'vm-btn-ghost':'vm-btn-primary')+' vm-btn-block" style="padding:9px;font-size:.88rem;margin-top:10px">'+
-              (attempts?'Read again →':'Start reading →')+
-            '</button>'+
-          '</div>';
-        }).join('')+
+
+      // ── Saved articles ──
+      '<div>'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'+
+          '<div style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--vm-ink-2)">📚 BÀI ĐÃ LƯU</div>'+
+          '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="rwRefreshBtn">↺ Tải lại</button>'+
+        '</div>'+
+        '<div id="rwSavedList">'+renderSavedList(_rwArticles)+
+        '</div>'+
       '</div>';
 
-    VM.els('[data-rw-open]').forEach(function(card){
-      card.onclick=function(){
-        var a=articles.find(function(x){return x.assignmentId===card.getAttribute('data-rw-open');});
-        if(a) openRWArticle(a);
-      };
-    });
+    document.getElementById('rwRefreshBtn').onclick=function(){ renderReadWise(); };
+    document.getElementById('rwAnalyseBtn').onclick=analyseAndSaveArticle;
+    bindSavedList();
   }).catch(function(){
     hideOverlay();
-    document.getElementById('vmContent').innerHTML='<div class="vm-empty"><p>Connection error. Please try again.</p></div>';
+    document.getElementById('vmContent').innerHTML='<div class="vm-empty"><p>Connection error. Try again.</p></div>';
   });
 }
-function rwStat(v,l){
-  return '<div class="rw-stat-card"><div class="rw-stat-val">'+VM.esc(String(v))+'</div><div class="rw-stat-lbl">'+VM.esc(l)+'</div></div>';
+
+function renderSavedList(articles){
+  if(!articles||!articles.length)
+    return '<div class="vm-empty" style="padding:30px 20px"><p>Chưa có bài nào. Dán bài đọc và phân tích để lưu.</p></div>';
+  return articles.map(function(a){
+    return '<div style="display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid var(--vm-border-2)" data-rw-row="'+VM.esc(a.articleId)+'">'+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="font-weight:700;font-size:.95rem;color:var(--vm-ink);margin-bottom:3px">'+VM.esc(a.title)+'</div>'+
+        '<div style="font-size:.76rem;color:var(--vm-ink-3)">'+
+          a.wordCount+' từ · ~'+a.readMin+' phút đọc · '+VM.esc(VM.fmtDate(a.savedAt))+
+        '</div>'+
+      '</div>'+
+      '<button class="vm-btn vm-btn-primary vm-btn-sm" data-rw-open="'+VM.esc(a.articleId)+'" style="white-space:nowrap;padding:8px 16px">'+
+        'Đọc →'+
+      '</button>'+
+    '</div>';
+  }).join('');
 }
 
-function openRWArticle(asgn){
+function bindSavedList(){
+  VM.els('[data-rw-open]').forEach(function(btn){
+    btn.onclick=function(){
+      openRWReader(btn.getAttribute('data-rw-open'));
+    };
+  });
+}
+
+function analyseAndSaveArticle(){
+  var title   = (document.getElementById('rwTitle').value||'').trim();
+  var passage = (document.getElementById('rwPassageTa').value||'').trim();
+  var key     = (document.getElementById('rwGemKey').value||'').trim();
+  var status  = document.getElementById('rwAnalyseStatus');
+
+  if(!title){ VM.toast('Nhập tiêu đề bài đọc.','warn'); return; }
+  var wc = passage.split(/\s+/).filter(Boolean).length;
+  if(wc < 100){ VM.toast('Bài đọc phải có ít nhất 100 từ.','warn'); return; }
+  if(!key){ VM.toast('Nhập Gemini API key.','warn'); return; }
+
+  setRWKey(key);
+  var btn=document.getElementById('rwAnalyseBtn');
+  btn.disabled=true;
+
+  status.textContent='⏳ Đang trích xuất từ vựng…';
+
+  // Step 1: extract vocab from passage using Gemini
+  var vocabPrompt =
+    'Extract 20-40 important vocabulary words from this English passage for Vietnamese EFL learners.\n'+
+    'Focus on B1-C2 level words. Return ONLY a JSON array, no markdown:\n'+
+    '[{"word":"...","ipa":"British IPA","vi":"Vietnamese 1-5 words","synonyms":"syn1, syn2"}]\n\n'+
+    'Passage:\n'+passage.slice(0,3000);
+
+  var collocPrompt =
+    'Extract 8-12 key phrases and collocations from this English passage.\n'+
+    'Return ONLY a JSON array, no markdown:\n'+
+    '[{"phrase":"...","meaning":"Vietnamese meaning"}]\n\n'+
+    'Passage:\n'+passage.slice(0,2000);
+
+  var MODELS=['gemini-2.5-flash-lite','gemini-2.5-flash'];
+
+  function callGemini(prompt, parseArr){
+    var mi=0;
+    function tryM(){
+      if(mi>=MODELS.length) return Promise.reject(new Error('All models failed'));
+      var m=MODELS[mi++];
+      return fetch('https://generativelanguage.googleapis.com/v1beta/models/'+m+':generateContent?key='+encodeURIComponent(key),{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:4096,temperature:0.1}})
+      }).then(function(r){
+        if(r.status===429) return new Promise(function(rs){setTimeout(rs,3000);}).then(tryM);
+        if(!r.ok) return r.json().catch(function(){return{};}).then(function(e){throw new Error((e.error&&e.error.message)||'HTTP '+r.status);});
+        return r.json();
+      }).then(function(d){
+        var parts=(((d.candidates||[])[0]||{}).content||{}).parts||[];
+        var text=parts.map(function(p){return p.text||'';}).join('').trim();
+        if(!text) throw new Error('Empty response');
+        text=text.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+        var opens=(text.match(/\{/g)||[]).length,closes=(text.match(/\}/g)||[]).length;
+        if(opens>closes) text=text.replace(/,?\s*$/,'')+'}]';
+        if(!text.endsWith(']')) text+=']';
+        return JSON.parse(text);
+      }).catch(function(err){if(mi<MODELS.length)return tryM();throw err;});
+    }
+    return tryM();
+  }
+
+  var vocabResult=[], collocResult=[];
+
+  callGemini(vocabPrompt,true).then(function(arr){
+    vocabResult=arr;
+    status.textContent='⏳ Đang trích xuất cụm từ…';
+    return callGemini(collocPrompt,true);
+  }).then(function(arr){
+    collocResult=arr;
+    status.textContent='⏳ Đang lưu bài…';
+    return VM.api('readwise.save',{
+      studentId:   sess.studentId,
+      studentName: sess.name||'',
+      class:       sess.class||'',
+      title:       title,
+      passage:     passage,
+      vocab:       vocabResult,
+      collocations:collocResult
+    });
+  }).then(function(res){
+    btn.disabled=false;
+    if(res&&res.success){
+      status.textContent='✅ Đã lưu! Bài đọc sẵn sàng.';
+      VM.toast('Bài đọc đã được lưu!','ok');
+      // Reload list
+      VM.api('readwise.list',{studentId:sess.studentId}).then(function(r){
+        if(r&&r.success){
+          _rwArticles=r.data||[];
+          var listEl=document.getElementById('rwSavedList');
+          if(listEl) listEl.innerHTML=renderSavedList(_rwArticles);
+          bindSavedList();
+        }
+      });
+    } else {
+      status.textContent='❌ '+(res&&res.error)||'Lưu thất bại.';
+    }
+  }).catch(function(err){
+    btn.disabled=false;
+    status.textContent='❌ Lỗi: '+(err.message||err);
+    VM.toast('Error: '+(err.message||err),'err',5000);
+  });
+}
+
+function openRWReader(articleId){
+  showOverlay('Loading article…');
+  VM.api('readwise.get',{articleId:articleId}).then(function(res){
+    hideOverlay();
+    if(!res||!res.success){ VM.toast('Article not found.','err'); return; }
+    var art=res.data;
+    _currentRWArticle=art;
+    renderRWReader(art);
+  }).catch(function(){hideOverlay();VM.toast('Connection error.','err');});
+}
+var _currentRWArticle=null;
+
+function renderRWReader(art){
   var c=document.getElementById('vmContent');
-  VM.setTitle(asgn.title);
-  var vocab=asgn.vocab||[];
+  VM.setTitle(art.title);
   var vis={A1:true,A2:true,B1:true,B2:true,C1:true,C2:true};
   var meanings={};
-  vocab.forEach(function(v){ meanings[(v.word||'').toLowerCase()]={vi:v.vi||v.meaningVi||'',ipa:v.ipa||''}; });
-  var gemKey=VM.geminiKey.get();
+  var gemKey=getRWKey()||VM.geminiKey.get();
+  // Pre-fill meanings from saved vocab
+  (art.vocab||[]).forEach(function(v){
+    meanings[(v.word||'').toLowerCase()]={vi:v.vi||'',ipa:v.ipa||''};
+  });
 
   function buildPassage(){
-    if(!hasCEFR) return VM.esc(asgn.reading||'').replace(/\n/g,'<br>');
-    return VMCEFR.renderPassage(asgn.reading||'',{visibleLevels:vis,meanings:meanings,vocabHighlight:vocab.map(function(v){return v.word;})});
+    if(!hasCEFR) return VM.esc(art.passage||'').replace(/\n/g,'<br>');
+    return VMCEFR.renderPassage(art.passage||'',{
+      visibleLevels:vis, meanings:meanings,
+      vocabHighlight:(art.vocab||[]).map(function(v){return v.word;})
+    });
   }
 
   function buildBD(){
-    if(!hasCEFR||!asgn.reading) return '';
-    var tk=VMCEFR.analyze(asgn.reading);var bd=VMCEFR.breakdown(tk);
+    if(!hasCEFR||!art.passage) return '';
+    var tk=VMCEFR.analyze(art.passage),bd=VMCEFR.breakdown(tk);
+    var LC2={'1':'#22C55E','2':'#3B82F6','3':'#F59E0B','4':'#EF4444','5':'#8B5CF6','6':'#EC4899'};
+    var LN2={'A1':'1','A2':'2','B1':'3','B2':'4','C1':'5','C2':'6'};
     var lvs=['A1','A2','B1','B2','C1','C2'];
     return '<div class="cefr-breakdown"><h4>CEFR Breakdown</h4>'+
       lvs.map(function(lv){
-        var count=bd[lv]||0,pct=bd.total?Math.round(count/bd.total*100):0,col=LC[LN[lv]];
+        var count=bd[lv]||0,pct=bd.total?Math.round(count/bd.total*100):0,col=LC2[LN2[lv]];
         return '<div class="cefr-bd-row"><span class="lbl" style="color:'+col+'">'+lv+'</span>'+
           '<div class="cefr-bd-bw"><div class="cefr-bd-b" style="width:'+pct+'%;background:'+col+'"></div></div>'+
-          '<span class="cefr-bd-pct">'+pct+'%</span><span style="font-size:.68rem;color:var(--vm-ink-3);min-width:22px">'+count+'</span></div>';
+          '<span class="cefr-bd-pct">'+pct+'%</span>'+
+          '<span style="font-size:.68rem;color:var(--vm-ink-3);min-width:22px">'+count+'</span></div>';
       }).join('')+
       '<div style="font-size:.7rem;color:var(--vm-ink-3);margin-top:6px">Total: '+bd.total+' words</div></div>';
   }
 
   function buildFilterBar(){
     if(!hasCEFR) return '';
-    var tk=VMCEFR.analyze(asgn.reading||'');var bd=VMCEFR.breakdown(tk);
+    var LC2={'1':'#22C55E','2':'#3B82F6','3':'#F59E0B','4':'#EF4444','5':'#8B5CF6','6':'#EC4899'};
+    var LN2={'A1':'1','A2':'2','B1':'3','B2':'4','C1':'5','C2':'6'};
+    var tk=hasCEFR?VMCEFR.analyze(art.passage||''):[];
+    var bd=hasCEFR?VMCEFR.breakdown(tk):{};
     var lvs=['A1','A2','B1','B2','C1','C2'];
     return '<div class="cefr-filterbar">'+
       '<span style="font-weight:700;color:var(--vm-ink-3);font-size:.76rem;flex:0 0 auto">CEFR:</span>'+
       lvs.map(function(lv){
-        var col=LC[LN[lv]];
+        var col=LC2[LN2[lv]];
         return '<label data-flv="'+lv+'" style="opacity:'+(vis[lv]?1:.38)+'">'+
           '<input type="checkbox" data-lv="'+lv+'" style="display:none" '+(vis[lv]?'checked':'')+'>'+
           '<span class="cefr-dot" style="background:'+col+'"></span>'+
-          ' <span style="color:'+col+'">'+lv+'</span> <span class="cefr-count">'+(bd[lv]||0)+'</span></label>';
+          ' <span style="color:'+col+'">'+lv+'</span>'+
+          '<span class="cefr-count">'+(bd[lv]||0)+'</span>'+
+        '</label>';
       }).join('')+
       '<span class="cefr-sep">│</span>'+
       (gemKey
-        ? '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="aiBtnR" style="font-size:.75rem;padding:5px 9px">✨ Translate</button>'+
-          '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="colBtnR" style="font-size:.75rem;padding:5px 9px">🔗 Collocations</button>'
-        : '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="keyBtnR" style="font-size:.75rem;padding:5px 9px">🔑 Add Gemini key</button>')+
+        ? '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="rwTransBtn" style="font-size:.75rem;padding:5px 9px">✨ Translate</button>'+
+          '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="rwColBtn"   style="font-size:.75rem;padding:5px 9px">🔗 Collocations</button>'
+        : '')+
+      '<button class="vm-btn vm-btn-primary vm-btn-sm" id="rwQuizBtn" style="font-size:.75rem;padding:5px 9px;margin-left:auto">📝 Quiz</button>'+
     '</div>';
   }
 
   function render(){
     c.innerHTML=
-      '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="rwBack2" style="margin-bottom:10px">← Back</button>'+
-      '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px">'+
-        '<h2 style="font-family:var(--vm-font-display);font-size:1.15rem;margin:0">'+VM.esc(asgn.title)+'</h2>'+
-        '<button class="vm-btn vm-btn-primary" id="startRWQuiz" style="padding:9px 18px;font-size:.88rem">📝 Take Quiz</button>'+
+      // Topbar matching vocab master style
+      '<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">'+
+        '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="rwBack">← Back</button>'+
+        '<div style="flex:1;min-width:0">'+
+          '<h2 style="font-family:var(--vm-font-display);font-size:1.15rem;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+VM.esc(art.title)+'</h2>'+
+          '<div style="font-size:.75rem;color:var(--vm-ink-3);margin-top:2px">'+
+            ((art.passage||'').split(/\s+/).filter(Boolean).length)+' words · '+
+            VM.esc(VM.fmtDate(art.savedAt))+
+          '</div>'+
+        '</div>'+
       '</div>'+
       buildFilterBar()+
-      (!gemKey?
-        '<div style="background:var(--vm-surface-2);border:1px solid var(--vm-border-2);border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:.8rem">'+
-          '<p style="margin:0 0 7px;font-weight:600;color:var(--vm-ink-2)">Add Gemini API key for AI translation &amp; collocations:</p>'+
-          '<div style="display:flex;gap:6px"><input id="rwKeyIn" type="password" placeholder="AIza…" style="flex:1;border:1px solid var(--vm-border);border-radius:6px;padding:6px 8px;font-size:.8rem;background:var(--vm-surface)">'+
-          '<button id="rwKeySave" style="background:var(--vm-primary);color:#fff;border:none;border-radius:6px;padding:6px 10px;font-size:.77rem;font-weight:600;cursor:pointer">Save</button></div>'+
-        '</div>':'') +
       '<div class="cefr-shell">'+
-        '<div><div class="cefr-passage" id="rwPassage">'+buildPassage()+'</div></div>'+
-        '<div class="cefr-right-panel" id="rwRight">'+
+        '<div><div class="cefr-passage" id="rwCEFRPassage">'+buildPassage()+'</div></div>'+
+        '<div class="cefr-right-panel" id="rwRightPanel">'+
           buildBD()+
-          '<div class="cefr-colloc" id="rwCollocBox" style="display:none">'+
-            '<h4>🔗 Phrases &amp; Collocations</h4><div id="rwCollocList"></div>'+
+          '<div class="cefr-colloc" id="rwCollocBox" style="display:'+(art.collocations&&art.collocations.length?'block':'none')+'">'+
+            '<h4>🔗 Cụm từ &amp; Collocations</h4>'+
+            '<div id="rwCollocList">'+renderCollocations(art.collocations||[])+'</div>'+
           '</div>'+
         '</div>'+
       '</div>';
 
-    document.getElementById('rwBack2').onclick=function(){switchTab('reading');};
-    document.getElementById('startRWQuiz').onclick=function(){ openRWQuiz(asgn); };
+    document.getElementById('rwBack').onclick=function(){ renderReadWise(); };
+    document.getElementById('rwQuizBtn').onclick=function(){ openRWQuiz(art); };
 
     // Filter toggles
     VM.els('[data-lv]').forEach(function(inp){
       inp.closest('label').onclick=function(e){
         e.preventDefault();
-        var lv=inp.getAttribute('data-lv'); vis[lv]=!vis[lv];
+        var lv=inp.getAttribute('data-lv');vis[lv]=!vis[lv];
         inp.closest('label').style.opacity=vis[lv]?'1':'.38';
-        document.getElementById('rwPassage').innerHTML=buildPassage();
+        document.getElementById('rwCEFRPassage').innerHTML=buildPassage();
         bindPassClicks();
       };
     });
 
-    var aib=document.getElementById('aiBtnR');
-    if(aib) aib.onclick=function(){
-      aib.disabled=true;aib.textContent='⏳…';
-      var toks=hasCEFR?VMCEFR.analyze(asgn.reading||''):[];
+    var tb=document.getElementById('rwTransBtn');
+    if(tb) tb.onclick=function(){
+      tb.disabled=true;tb.textContent='⏳…';
+      var toks=hasCEFR?VMCEFR.analyze(art.passage||''):[];
       var words=[],seen={};
       toks.forEach(function(t){if(t.level&&!seen[t.clean.toLowerCase()]){seen[t.clean.toLowerCase()]=1;words.push(t.clean.toLowerCase());}});
-      VMCEFR.fetchMeanings(words,gemKey,vocab).then(function(map){
-        meanings=map;
-        document.getElementById('rwPassage').innerHTML=buildPassage();
-        bindPassClicks();
-        aib.disabled=false;aib.textContent='✨ Translate';
-        VM.toast('Translated '+Object.keys(map).length+' words','ok');
-      });
+      if(typeof VMCEFR!=='undefined'&&VMCEFR.fetchMeanings){
+        VMCEFR.fetchMeanings(words,gemKey,art.vocab||[]).then(function(map){
+          meanings=map;
+          document.getElementById('rwCEFRPassage').innerHTML=buildPassage();
+          bindPassClicks();
+          tb.disabled=false;tb.textContent='✨ Translate';
+          VM.toast('Translated '+Object.keys(map).length+' words','ok');
+        });
+      }
     };
 
-    var cb=document.getElementById('colBtnR');
+    var cb=document.getElementById('rwColBtn');
     if(cb) cb.onclick=function(){
       cb.disabled=true;cb.textContent='⏳…';
-      VMCEFR.collocations(asgn.reading||'',gemKey).then(function(list){
+      VM.collocations(art.passage||'',gemKey).then(function(list){
         var box=document.getElementById('rwCollocBox'),el=document.getElementById('rwCollocList');
-        box.style.display='';
-        el.innerHTML=list.map(function(i){
-          return '<div class="cefr-colloc-item"><div class="cefr-colloc-phrase">'+VM.esc(i.phrase)+'</div>'+
-            '<div class="cefr-colloc-vi">'+VM.esc(i.meaning)+'</div></div>';
-        }).join('');
+        box.style.display='block';
+        el.innerHTML=renderCollocations(list);
         cb.disabled=false;cb.textContent='🔗 Collocations';
-        VM.toast(list.length+' phrases found','ok');
+        VM.toast(list.length+' phrases','ok');
       });
-    };
-
-    var ks=document.getElementById('rwKeySave');
-    if(ks) ks.onclick=function(){
-      var v=(document.getElementById('rwKeyIn').value||'').trim();
-      if(!v){VM.toast('Enter key.','warn');return;}
-      VM.geminiKey.set(v);gemKey=v;render();
-    };
-
-    var kb=document.getElementById('keyBtnR');
-    if(kb) kb.onclick=function(){
-      var box=document.querySelector('.cefr-filterbar + div');
-      if(box) box.style.display=box.style.display==='none'?'':'none';
     };
 
     bindPassClicks();
   }
 
+  function renderCollocations(list){
+    if(!list||!list.length) return '<div style="color:var(--vm-ink-3);font-size:.8rem">Chưa có. Bấm 🔗 để trích xuất.</div>';
+    return list.map(function(i){
+      return '<div class="cefr-colloc-item"><div class="cefr-colloc-phrase">'+VM.esc(i.phrase)+'</div>'+
+        '<div class="cefr-colloc-vi">'+VM.esc(i.meaning)+'</div></div>';
+    }).join('');
+  }
+
   function bindPassClicks(){
     VM.els('.vm-cefr-word').forEach(function(span){
       span.onclick=function(){
-        showCEFRTip(span,span.getAttribute('data-word'),span.getAttribute('data-level'),meanings[(span.getAttribute('data-word')||'').toLowerCase()]||null);
+        showCEFRTip(span,span.getAttribute('data-word'),span.getAttribute('data-level'),
+          meanings[(span.getAttribute('data-word')||'').toLowerCase()]||null);
       };
     });
   }
@@ -781,175 +969,274 @@ function openRWArticle(asgn){
   render();
 }
 
-function openRWQuiz(asgn){
-  var vocab=asgn.vocab||[];
-  // Build comprehension questions from vocab (definition matching, up to RW_VOCAB_COUNT)
-  var shuffled=VM._shuffle(vocab.slice()).slice(0,RW_VOCAB_COUNT);
-  var quiz=VM.buildQuiz(shuffled,{mode:'choice',shuffle:true});
+function openRWQuiz(art){
+  var vocab = art.vocab || [];
+  if(!vocab.length){ VM.toast('No vocabulary to quiz.','warn'); return; }
 
-  // Comprehension questions (content-based, up to RW_COMP_COUNT) from passage
-  // Simple: fill-in from examples in passage sentences
-  var compQ=buildCompQuestions(asgn.reading||'',asgn.vocab||[],RW_COMP_COUNT);
+  // Build fresh 65-question quiz (random each time — spaced repetition like homework)
+  S.quiz = VM.buildQuiz(vocab, { isReview:false, total:65 });
+  S.quizState = {
+    asgn: {
+      assignmentId: 'rw_' + art.articleId,
+      title: art.title,
+      mode: 'readwise',
+      vocab: vocab,
+      requiredGoals: 0,
+      classId: sess.class||''
+    },
+    qIdx: 0, correct: 0, startTs: Date.now(),
+    wrongAnswers: {}
+  };
 
-  var allQ=quiz.questions.concat(compQ);
-  var c=document.getElementById('vmContent');
-  VM.setTitle('ReadWise Quiz — '+asgn.title);
+  var c = document.getElementById('vmContent');
+  VM.setTitle('Quiz — ' + art.title);
+  c.innerHTML =
+    '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="rwQBack" style="margin-bottom:10px">← Back to article</button>'+
+    '<div id="quizArea"></div>';
 
-  var qIdx=0,correct=0,startTs=Date.now();
+  document.getElementById('rwQBack').onclick = function(){ renderRWReader(art); };
 
-  function renderRWQ(){
-    var q=allQ[qIdx],total=allQ.length,pct=Math.round(qIdx/total*100);
-    var isComp=q._comp;
-    c.innerHTML=
-      '<div class="vm-quiz-wrap">'+
-        '<div style="font-size:.78rem;color:var(--vm-ink-3);margin-bottom:8px">'+
-          (qIdx<quiz.questions.length?'📚 Vocabulary ('+(qIdx+1)+'/'+quiz.questions.length+')':'📖 Comprehension ('+(qIdx-quiz.questions.length+1)+'/'+compQ.length+')')+
-        '</div>'+
-        '<div class="vm-quiz-header">'+
-          '<div class="vm-quiz-progress">Question '+(qIdx+1)+'/'+total+
-            '<div class="vm-quiz-bar"><div class="vm-quiz-bar-fill" style="width:'+pct+'%"></div></div>'+
-          '</div>'+
-          '<span style="font-size:.8rem;color:var(--vm-ink-3)">✓ '+correct+'</span>'+
-        '</div>'+
-        '<div class="vm-quiz-card">'+
-          '<div class="vm-quiz-q">'+VM.esc(q.prompt)+'</div>'+
-          '<div class="vm-quiz-options">'+
-            q.options.map(function(opt){return '<button class="vm-opt" data-ans="'+VM.esc(opt)+'">'+VM.esc(opt)+'</button>';}).join('')+
-          '</div>'+
-          '<div class="vm-quiz-fb" id="rwFb"></div>'+
-          '<button class="vm-btn vm-btn-primary vm-quiz-submit" id="rwSubmit" disabled>Confirm</button>'+
-        '</div>'+
-      '</div>';
-
-    var answered=false,selected=null;
-    VM.els('[data-ans]').forEach(function(btn){
-      btn.onclick=function(){
-        if(answered) return;
-        selected=btn.getAttribute('data-ans');
-        VM.els('[data-ans]').forEach(function(b){b.classList.remove('selected');});
-        btn.classList.add('selected');
-        document.getElementById('rwSubmit').disabled=false;
-      };
-    });
-    document.getElementById('rwSubmit').onclick=function(){
-      if(answered||!selected) return;
-      answered=true;
-      var isCorrect=selected===q.answer;
-      if(isCorrect) correct++;
-      VM.els('[data-ans]').forEach(function(btn){
-        btn.disabled=true;btn.classList.remove('selected');
-        if(btn.getAttribute('data-ans')===q.answer) btn.classList.add('correct');
-        else if(btn.getAttribute('data-ans')===selected&&!isCorrect) btn.classList.add('wrong');
-      });
-      var fb=document.getElementById('rwFb');
-      if(fb){fb.className='vm-quiz-fb '+(isCorrect?'ok':'bad');fb.textContent=isCorrect?'✓ Correct!':'✗ Answer: '+q.answer;}
-      document.getElementById('rwSubmit').textContent='Submitted';
-      setTimeout(function(){qIdx++;if(qIdx>=allQ.length) showRWResult();else renderRWQ();},isCorrect?900:1800);
-    };
-  }
-
-  function showRWResult(){
-    var score=Math.round(correct/allQ.length*100);
-    var dur=Math.round((Date.now()-startTs)/1000);
-    showOverlay('Saving result…');
-    VM.api('result.save',{
-      studentId:sess.studentId,name:sess.name,class:sess.class,
-      assignmentId:asgn.assignmentId,title:asgn.title,mode:'readwise',
-      score:score,isPerfect:score===100,durationSec:dur,correct:correct,total:allQ.length
-    }).then(function(r){
-      hideOverlay();
-      if(r&&r.success) loadMyResults(function(){});
-      else VM.toast('Failed to save.','err');
-    }).catch(function(){hideOverlay();VM.toast('Connection error.','err');});
-
-    var sc=score>=90?'var(--vm-ok)':(score>=60?'#A66B00':'var(--vm-danger)');
-    c.innerHTML=
-      '<div class="vm-result-banner'+(score===100?' vm-perfect-anim':'')+'" style="margin-top:8px">'+
-        (score===100?'<div style="font-size:2.4rem;margin-bottom:6px">🎉</div>':'')+
-        '<div class="vm-result-score" style="color:'+sc+'">'+score+'%</div>'+
-        '<div class="vm-result-label">'+correct+'/'+allQ.length+' correct</div>'+
-        '<div class="vm-result-badges" style="margin-top:14px">'+
-          bdg(VM.fmtDuration(dur),'Duration')+
-          bdg(quiz.questions.length,'Vocab Qs')+
-          bdg(compQ.length,'Comprehension Qs')+
-        '</div>'+
-        '<div style="display:flex;gap:10px;justify-content:center;margin-top:18px;flex-wrap:wrap">'+
-          '<button class="vm-btn vm-btn-primary" id="rwAgain">Read Again</button>'+
-          '<button class="vm-btn vm-btn-ghost" id="rwDone">← Back</button>'+
-        '</div>'+
-      '</div>';
-    document.getElementById('rwAgain').onclick=function(){openRWArticle(asgn);};
-    document.getElementById('rwDone').onclick=function(){switchTab('reading');};
-  }
-
-  renderRWQ();
+  // Set active article so showResult can return to reader
+  _currentRWArticle = art;
+  renderQ();
 }
 
-function buildCompQuestions(passage,vocab,count){
-  // Generate simple comprehension MCQs from the passage sentences
-  if(!passage) return [];
-  var sentences=passage.split(/[.!?]+/).map(function(s){return s.trim();}).filter(function(s){return s.split(/\s+/).length>=6;});
-  var qs=[];
-  var vocabSet={};
-  vocab.forEach(function(v){vocabSet[(v.word||'').toLowerCase()]=v;});
-
-  sentences.slice(0,count*2).forEach(function(sent){
-    if(qs.length>=count) return;
-    // Find a vocab word in the sentence to blank out
-    var words=sent.split(/\s+/);
-    var targetIdx=-1,targetWord=null;
-    for(var i=0;i<words.length;i++){
-      var w=words[i].toLowerCase().replace(/[^a-z]/g,'');
-      if(vocabSet[w]&&w.length>3){targetIdx=i;targetWord=w;break;}
-    }
-    if(targetIdx===-1) return;
-    var blanked=words.map(function(w,i){return i===targetIdx?'_____':w;}).join(' ');
-    var correct=words[targetIdx];
-    // Wrong options from other vocab words
-    var others=Object.keys(vocabSet).filter(function(k){return k!==targetWord;});
-    var wrong=VM._shuffle(others).slice(0,3).map(function(k){return vocabSet[k].word||k;});
-    qs.push({prompt:blanked,options:VM._shuffle([correct].concat(wrong)),answer:correct,_comp:true});
-  });
-
-  // If not enough, add definition-matching questions
-  var remaining=count-qs.length;
-  if(remaining>0&&vocab.length){
-    var extra=VM._shuffle(vocab.slice()).slice(0,remaining);
-    extra.forEach(function(v){
-      var others2=VM._shuffle(vocab.filter(function(x){return x.word!==v.word;})).slice(0,3);
-      var opts=VM._shuffle([v].concat(others2)).map(function(x){return x.word;});
-      qs.push({prompt:'Which word means: "'+( v.synonyms&&v.synonyms[0]?v.synonyms[0]:v.vi||v.meaningVi||v.word)+'"?',options:opts,answer:v.word,_comp:true});
-    });
-  }
-  return qs.slice(0,count);
-}
 
 /* ── History ──────────────────────────────────── */
 function renderHistory(){
   showOverlay('Loading history…');
   loadMyResults(function(){
     hideOverlay();
-    var c=document.getElementById('vmContent');
-    if(!S.myResults.length){c.innerHTML='<div class="vm-empty"><p>No history yet.</p></div>';return;}
-    var rows=S.myResults.slice().sort(function(a,b){return new Date(b.timestamp)-new Date(a.timestamp);});
-    var modeIcon={homework:'📝',inclass:'🖥️',readwise:'📖'};
-    c.innerHTML=
-      '<div class="vm-table-wrap"><table class="vm-table"><thead><tr>'+
-        '<th>Time</th><th>Assignment</th><th>Mode</th><th>Score</th><th>Correct</th><th>Duration</th>'+
-      '</tr></thead><tbody>'+
-      rows.map(function(r){
-        return '<tr>'+
-          '<td style="font-size:.76rem">'+VM.esc(VM.fmtDate(r.timestamp))+'</td>'+
-          '<td><b style="font-size:.82rem">'+VM.esc(r.title||r.assignmentId)+'</b></td>'+
-          '<td>'+(modeIcon[r.mode]||'')+'<span style="font-size:.76rem;color:var(--vm-ink-3);margin-left:3px">'+VM.esc(r.mode||'')+'</span></td>'+
-          '<td class="vm-score '+scoreC(r.score)+'">'+r.score+'%'+(r.isPerfect?' ★':'')+'</td>'+
-          '<td>'+r.correct+'/'+r.total+'</td>'+
-          '<td>'+VM.fmtDuration(r.durationSec)+'</td>'+
-        '</tr>';
-      }).join('')+
-    '</tbody></table></div>';
+    var c = document.getElementById('vmContent');
+    if(!S.myResults.length){
+      c.innerHTML='<div class="vm-empty"><p>No history yet.</p></div>'; return;
+    }
+
+    // ── Group results by assignmentId ────────────────────────────
+    var groups = {};
+    S.myResults.forEach(function(r){
+      var key = r.assignmentId;
+      if(!groups[key]){
+        groups[key] = {
+          assignmentId: key,
+          title:   r.title || key,
+          mode:    r.mode  || '',
+          runs:    [],
+        };
+      }
+      groups[key].runs.push(r);
+    });
+
+    // Sort groups: most recent first
+    var groupList = Object.values ? Object.values(groups) : Object.keys(groups).map(function(k){return groups[k];});
+    groupList.sort(function(a,b){
+      var la = a.runs[a.runs.length-1], lb = b.runs[b.runs.length-1];
+      return new Date(lb.timestamp) - new Date(la.timestamp);
+    });
+
+    // ── Mode filter tabs ─────────────────────────────────────────
+    var activeMode = 'all';
+    var MODES = ['all','homework','inclass','readwise'];
+    var modeIcon = {homework:'📝', inclass:'🖥️', readwise:'📖'};
+
+    function renderGroups(){
+      var filtered = activeMode==='all' ? groupList
+        : groupList.filter(function(g){ return g.mode===activeMode; });
+
+      if(!filtered.length)
+        return '<div class="vm-empty" style="padding:30px"><p>No results for this mode.</p></div>';
+
+      return filtered.map(function(g){
+        var runs = g.runs.slice().sort(function(a,b){return new Date(a.timestamp)-new Date(b.timestamp);});
+        var attempts = runs.length;
+        var perfects = runs.filter(function(r){return r.isPerfect;}).length;
+        var bestScore = Math.max.apply(null, runs.map(function(r){return parseFloat(r.score)||0;}));
+        var lastScore = parseFloat(runs[runs.length-1].score)||0;
+        var lastTs    = runs[runs.length-1].timestamp;
+
+        // Missed word frequency across all runs
+        var missedFreq = {};
+        runs.forEach(function(r){
+          var mw = [];
+          try{ mw = JSON.parse(r.missedWords||'[]'); }catch(e){ mw = []; }
+          mw.forEach(function(w){ if(w) missedFreq[w] = (missedFreq[w]||0)+1; });
+        });
+        var topMissed = Object.keys(missedFreq)
+          .sort(function(a,b){ return missedFreq[b]-missedFreq[a]; })
+          .slice(0,8);
+
+        // Score trend: last 5 runs
+        var trend = runs.slice(-5).map(function(r){
+          var sc = parseFloat(r.score)||0;
+          var col = sc>=90?'var(--vm-ok)':(sc>=60?'#F59E0B':'var(--vm-danger)');
+          return '<span style="display:inline-block;width:28px;height:28px;border-radius:50%;background:'+col+
+            ';color:#fff;font-size:.6rem;font-weight:700;text-align:center;line-height:28px" title="'+sc+'%">'+sc+'%</span>';
+        }).join('');
+
+        var modeLabel = (modeIcon[g.mode]||'') + ' ' + (g.mode||'');
+        var scoreColor = lastScore>=90?'var(--vm-ok)':(lastScore>=60?'#A66B00':'var(--vm-danger)');
+
+        // Expand/collapse state
+        var expandId = 'hist_'+g.assignmentId.replace(/[^a-z0-9]/gi,'_');
+
+        return '<div class="vm-card" style="margin-bottom:12px;overflow:hidden">'+
+          // Header row
+          '<div style="display:flex;align-items:center;gap:14px;padding:16px 20px;cursor:pointer" '+
+               'onclick="toggleHistGroup(this.getAttribute(\"data-hist-toggle\"))" data-hist-toggle="'+expandId+'">'+
+            '<div style="flex:1;min-width:0">'+
+              '<div style="font-family:var(--vm-font-display);font-weight:700;font-size:.95rem;color:var(--vm-ink);margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+
+                VM.esc(g.title)+
+              '</div>'+
+              '<div style="font-size:.75rem;color:var(--vm-ink-3)">'+modeLabel+' · Last: '+VM.esc(VM.fmtDate(lastTs))+'</div>'+
+            '</div>'+
+            // Mini stats
+            '<div style="display:flex;gap:16px;align-items:center;flex-shrink:0">'+
+              '<div style="text-align:center">'+
+                '<div style="font-family:var(--vm-font-display);font-size:1.3rem;font-weight:700;color:'+scoreColor+'">'+lastScore+'%</div>'+
+                '<div style="font-size:.66rem;color:var(--vm-ink-3);font-weight:600;text-transform:uppercase;letter-spacing:.04em">Last</div>'+
+              '</div>'+
+              '<div style="text-align:center">'+
+                '<div style="font-family:var(--vm-font-display);font-size:1.3rem;font-weight:700;color:var(--vm-ink)">'+attempts+'</div>'+
+                '<div style="font-size:.66rem;color:var(--vm-ink-3);font-weight:600;text-transform:uppercase;letter-spacing:.04em">Runs</div>'+
+              '</div>'+
+              '<div style="text-align:center">'+
+                '<div style="font-family:var(--vm-font-display);font-size:1.3rem;font-weight:700;color:var(--vm-ok)">'+bestScore+'%</div>'+
+                '<div style="font-size:.66rem;color:var(--vm-ink-3);font-weight:600;text-transform:uppercase;letter-spacing:.04em">Best</div>'+
+              '</div>'+
+              '<div style="font-size:.7rem;color:var(--vm-ink-3)">▾</div>'+
+            '</div>'+
+          '</div>'+
+
+          // Expandable detail
+          '<div id="'+expandId+'" style="display:none;border-top:1px solid var(--vm-border-2);padding:14px 20px;background:var(--vm-surface-2)">'+
+
+            // Score trend
+            '<div style="margin-bottom:12px">'+
+              '<div style="font-size:.72rem;font-weight:700;color:var(--vm-ink-3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px">Score Trend (last 5)</div>'+
+              '<div style="display:flex;gap:5px;align-items:center">'+trend+'</div>'+
+            '</div>'+
+
+            // Missed words
+            (topMissed.length?
+              '<div style="margin-bottom:12px">'+
+                '<div style="font-size:.72rem;font-weight:700;color:var(--vm-ink-3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px">'+
+                  'Most Missed Words'+
+                '</div>'+
+                '<div style="display:flex;flex-wrap:wrap;gap:5px">'+
+                  topMissed.map(function(w){
+                    var freq = missedFreq[w];
+                    var col = freq>=3?'#FDECEA,#8B1A1A':(freq===2?'#FEF3D6,#7A5000':'#E3F5EE,#0A4D28');
+                    var parts = col.split(',');
+                    return '<span style="background:'+parts[0]+';color:'+parts[1]+';border-radius:5px;padding:3px 9px;font-size:.77rem;font-weight:600">'+
+                      VM.esc(w)+' <span style="opacity:.65">×'+freq+'</span></span>';
+                  }).join('')+
+                '</div>'+
+              '</div>':'') +
+
+            // Run history table
+            '<div style="margin-bottom:10px">'+
+              '<div style="font-size:.72rem;font-weight:700;color:var(--vm-ink-3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px">Run History</div>'+
+              '<div style="overflow-x:auto">'+
+              '<table class="vm-table" style="font-size:.8rem">'+
+                '<thead><tr>'+
+                  '<th>#</th><th>Date</th><th>Score</th><th>Correct</th><th>Duration</th>'+
+                '</tr></thead>'+
+                '<tbody>'+
+                runs.map(function(r,i){
+                  var sc=parseFloat(r.score)||0;
+                  return '<tr>'+
+                    '<td style="color:var(--vm-ink-3)">'+(i+1)+'</td>'+
+                    '<td>'+VM.esc(VM.fmtDate(r.timestamp))+'</td>'+
+                    '<td class="vm-score '+scoreC(sc)+'"><b>'+sc+'%</b>'+(r.isPerfect?' ★':'')+'</td>'+
+                    '<td>'+VM.esc(r.correct+'/'+r.total)+'</td>'+
+                    '<td>'+VM.fmtDuration(r.durationSec)+'</td>'+
+                  '</tr>';
+                }).join('')+
+                '</tbody>'+
+              '</table></div>'+
+            '</div>'+
+
+            // Retry button (not for inclass)
+            (g.mode!=='inclass'?
+              '<button class="vm-btn vm-btn-primary vm-btn-sm" data-hist-retry="'+VM.esc(g.assignmentId)+'" data-hist-mode="'+VM.esc(g.mode)+'">'+
+                '🔄 Retry'+
+              '</button>':'') +
+
+          '</div>'+
+        '</div>';
+      }).join('');
+    }
+
+    function renderAll(){
+      c.innerHTML =
+        // Mode filter tabs
+        '<div class="vm-tabs" style="margin-bottom:16px">'+
+          MODES.map(function(m){
+            return '<button class="vm-tab'+(activeMode===m?' active':'')+'" data-hist-mode-tab="'+m+'">'+
+              (m==='all'?'All':(modeIcon[m]||'')+' '+m.charAt(0).toUpperCase()+m.slice(1))+
+            '</button>';
+          }).join('')+
+        '</div>'+
+        '<div id="histGroupsWrap">'+renderGroups()+'</div>';
+
+      // Mode tab click
+      VM.els('[data-hist-mode-tab]').forEach(function(btn){
+        btn.onclick=function(){
+          activeMode=btn.getAttribute('data-hist-mode-tab');
+          VM.els('[data-hist-mode-tab]').forEach(function(b){b.classList.toggle('active',b===btn);});
+          document.getElementById('histGroupsWrap').innerHTML=renderGroups();
+          bindHistActions();
+        };
+      });
+      bindHistActions();
+    }
+
+    function bindHistActions(){
+      // Retry buttons
+      VM.els('[data-hist-retry]').forEach(function(btn){
+        btn.onclick=function(){
+          var aid = btn.getAttribute('data-hist-retry');
+          var mode = btn.getAttribute('data-hist-mode');
+          if(mode==='readwise'){
+            // Load article from readwise list
+            showOverlay('Loading article…');
+            VM.api('readwise.get',{articleId:aid.replace('rw_','')}).then(function(res){
+              hideOverlay();
+              if(res&&res.success) openRWQuiz(res.data);
+              else VM.toast('Article not found.','err');
+            }).catch(function(){hideOverlay();VM.toast('Connection error.','err');});
+          } else {
+            var asgn = S.assignments.find(function(a){return a.assignmentId===aid;});
+            if(asgn){
+              _currentRWArticle=null;
+              S.quizState=null;
+              openReview(asgn);
+            } else {
+              VM.toast('Assignment no longer available.','warn');
+            }
+          }
+        };
+      });
+    }
+
+    renderAll();
   });
 }
+
+function toggleHistGroup(id){
+  var el=document.getElementById(id);
+  if(!el) return;
+  var isOpen=el.style.display!=='none';
+  el.style.display=isOpen?'none':'block';
+  // Rotate arrow
+  var toggle=document.querySelector('[data-hist-toggle="'+id+'"]');
+  if(toggle){
+    var arrow=toggle.querySelector('div:last-child');
+    if(arrow) arrow.textContent=isOpen?'▾':'▴';
+  }
+}
+
+
 function scoreC(s){return s>=90?'vm-score-hi':(s>=60?'vm-score-mid':'vm-score-lo');}
 
 /* ── mode-chips CSS (inline since we can't edit theme now) ── */
