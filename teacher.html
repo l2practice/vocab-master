@@ -598,42 +598,65 @@ document.getElementById('af-verify-key').onclick = function(){
   });
 };
 
-// Parse only (no AI)
+// Parse only (no AI) — reuse analyzeVocab's client-side parse, skip AI step
 document.getElementById('af-parse-only').onclick = function(){
   var raw = document.getElementById('af-vocab-raw').value;
   if (!raw.trim()) { VM.toast('Enter word list first.','warn'); return; }
-  var lines = raw.split('\n').filter(function(l){return l.trim();});
-  state.vocabRows = lines.map(function(l){
-    var parts = l.split('=');
-    var word  = parts[0].trim();
-    var syns  = parts[1] ? parts[1].split(',').map(function(s){return s.trim();}).filter(Boolean) : [];
-    return { word:word, ipa:'', synonyms:syns, vi:'' };
-  });
+  // Use a fake key so analyzeVocab parses client-side, then AI batch will fail gracefully
+  // Better: call with null key to skip AI entirely
+  var lines = raw.split('\n').map(function(l){ return l.trim(); }).filter(Boolean);
+  var rows = [];
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i].replace(/^\d+[\.)\s]+/, '').replace(/^[-\u2022\u2013\u2014*]\s*/, '').trim();
+    if (!line) continue;
+    var word='', syn='';
+    var eqIdx=line.indexOf('='), colIdx=line.indexOf(':');
+    var splitIdx=-1;
+    if(eqIdx>=0&&(colIdx<0||eqIdx<=colIdx)) splitIdx=eqIdx;
+    else if(colIdx>=0&&colIdx<40) splitIdx=colIdx;
+    if(splitIdx>=0){ word=line.slice(0,splitIdx).trim(); syn=line.slice(splitIdx+1).trim(); }
+    else { word=line.trim(); }
+    word=word.replace(/\s*[\(\[].+[\)\]]\s*$/, '').replace(/[,;:]+$/, '').trim();
+    if(word) {
+      var syns=syn?syn.split(',').map(function(s){return s.trim();}).filter(Boolean):[];
+      rows.push({word:word, ipa:'', synonyms:syns, vi:'', meaningVi:''});
+    }
+  }
+  state.vocabRows = rows;
   renderVocabTable();
-  VM.toast('Parsed '+state.vocabRows.length+' words.','ok');
+  VM.toast('Parsed '+rows.length+' words. IPA & Vietnamese empty — run AI Analyse to fill.','ok', 4000);
 };
 
-// Analyze with AI
+// Analyze with AI — 2-phase: parse immediately, enrich in background
 document.getElementById('af-analyze').onclick = function(){
   var raw = document.getElementById('af-vocab-raw').value;
   if (!raw.trim()) { VM.toast('Enter word list first.','warn'); return; }
   var key = VM.geminiKey.get();
   if (!key) {
     var typed = document.getElementById('af-gemini-key').value.trim();
-    if (!typed || typed === '••••• (key saved)') { VM.toast('Enter Gemini API key.','warn'); return; }
+    if (!typed || typed === '\u2022\u2022\u2022\u2022\u2022 (key saved)') { VM.toast('Enter Gemini API key.','warn'); return; }
     key = typed; VM.geminiKey.set(typed);
   }
-  document.getElementById('af-ai-progress').style.display='';
-  document.getElementById('af-analyze').disabled = true;
-  VM.analyzeVocab(raw, key, null).then(function(rows){
+  var progressEl = document.getElementById('af-ai-progress');
+  var analyzeBtn = document.getElementById('af-analyze');
+  progressEl.style.display='';
+  analyzeBtn.disabled = true;
+
+  VM.analyzeVocab(raw, key, function(done, total){
+    // onProgress callback — update table after each batch
+    progressEl.innerHTML =
+      '<span class="vm-spin" style="width:13px;height:13px;margin-right:6px"></span>' +
+      ' Analysing ' + done + '/' + total + ' words…';
+    if (state.vocabRows.length) renderVocabTable();
+  }).then(function(rows){
     state.vocabRows = rows;
     renderVocabTable();
-    document.getElementById('af-ai-progress').style.display='none';
-    document.getElementById('af-analyze').disabled=false;
-    VM.toast('Analysed '+rows.length+' words!','ok');
+    progressEl.style.display='none';
+    analyzeBtn.disabled=false;
+    VM.toast('Analysed ' + rows.length + ' words!','ok');
   }).catch(function(err){
-    document.getElementById('af-ai-progress').style.display='none';
-    document.getElementById('af-analyze').disabled=false;
+    progressEl.style.display='none';
+    analyzeBtn.disabled=false;
     VM.toast('AI error: '+err.message,'err',5000);
   });
 };

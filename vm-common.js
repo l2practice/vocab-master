@@ -8,7 +8,7 @@
 
   // ── CONFIG ─────────────────────────────────────
   // Replace with your deployed GAS /exec URL
-  var GAS = 'https://script.google.com/macros/s/AKfycbwe50uEyLe_oi__V_3eJ6JMfmbTqBbwR7u1md0JIGTGrILLOWoYSBCbqraXDltClqaf/exec';
+  var GAS = 'https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec';
 
   var VM = {
     GAS: GAS,
@@ -482,101 +482,145 @@
     vocabArray: [{word, synonyms, ipa, vi}]
   ─────────────────────────────────────────────────*/
   VM.analyzeVocab = function (rawList, apiKey, onProgress) {
-    var lines = rawList.split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
-    var parsed = lines.map(function (l) {
-      // Split on first '=' only
-      var eqIdx = l.indexOf('=');
-      var rawWord = eqIdx > -1 ? l.slice(0, eqIdx) : l;
-      var hint    = eqIdx > -1 ? l.slice(eqIdx + 1).trim() : '';
-      // Strip leading numbers/bullets: "1. word" "- word" "• word"
-      var word = rawWord
-        .replace(/^\s*[\d]+[\.)\-]\s*/, '')
-        .replace(/^\s*[-\u2022\u2013\u2014*]\s*/, '')
-        .replace(/\s*[\(\[].+[\)\]]\s*$/, '')
-        .replace(/[,;:]+$/, '')
-        .trim();
-      // Multi-word without '=': treat second+ words as hint
-      if (!hint) {
-        var toks = word.split(/\s+/);
-        if (toks.length > 2) { word = toks[0]; hint = toks.slice(1).join(' '); }
+    // ── Step 1: Parse client-side (no tokens used) ─────────────────
+    // Extracts word + synonym/definition from lines like:
+    //   polar= relating to the North Pole
+    //   threaten: to harm or destroy
+    //   biodiversity
+    var lines = rawList.split('\n').map(function(l){ return l.trim(); }).filter(Boolean);
+    var parsed = [];
+    for (var li = 0; li < lines.length; li++) {
+      var line = lines[li];
+      // Strip leading numbering: "1." "2)" "71 "
+      line = line.replace(/^\d+[\.)\s]+/, '').replace(/^[-\u2022\u2013\u2014*]\s*/, '').trim();
+      if (!line) continue;
+      var word = '', syn = '';
+      var eqIdx  = line.indexOf('=');
+      var colIdx = line.indexOf(':');
+      var splitIdx = -1;
+      if (eqIdx >= 0 && (colIdx < 0 || eqIdx <= colIdx)) splitIdx = eqIdx;
+      else if (colIdx >= 0 && colIdx < 40) splitIdx = colIdx;
+      if (splitIdx >= 0) {
+        word = line.slice(0, splitIdx).trim();
+        syn  = line.slice(splitIdx + 1).trim();
+      } else {
+        word = line.trim();
       }
-      return { word: word, hint: hint };
-    }).filter(function (p) { return p.word.length > 0; });
+      // Strip trailing noise from word (brackets, parens, punctuation)
+      word = word.replace(/\s*[\(\[].+[\)\]]\s*$/, '').replace(/[,;:]+$/, '').trim();
+      if (word) parsed.push({ word: word, syn: syn });
+    }
 
-    var prompt =
-      'You are a vocabulary assistant for Vietnamese EFL learners. ' +
-      'For each word below, provide: IPA pronunciation, English synonyms (up to 3, comma-separated), ' +
-      'and a concise Vietnamese translation (nghĩa tiếng Việt, ≤6 words). ' +
-      'If a hint/definition is given after "=", use it as context for the synonyms. ' +
-      'Return ONLY a JSON array, no markdown:\n' +
-      '[{"word":"...","ipa":"...","synonyms":"...","vi":"..."}]\n\n' +
-      'Words:\n' + parsed.map(function (p) {
-        return p.word + (p.hint ? ' = ' + p.hint : '');
-      }).join('\n');
+    if (!parsed.length) return Promise.reject(new Error('No words found.'));
 
-    var BATCH = 20;
-    var GAS_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=';
+    // ── Step 2: Show immediately with parsed data ───────────────────
+    var result = parsed.map(function(p) {
+      var syns = p.syn ? p.syn.split(',').map(function(s){ return s.trim(); }).filter(Boolean) : [];
+      return { word: p.word, ipa: '', synonyms: syns, vi: '', meaningVi: '' };
+    });
     if (onProgress) onProgress(0, parsed.length);
 
-    function callGemini(batch) {
-      var batchPrompt =
-        'You are a vocabulary assistant for Vietnamese EFL learners. ' +
-        'For each word, provide: IPA pronunciation (accurate), ' +
-        'English synonyms (up to 3, comma-separated), ' +
-        'concise Vietnamese translation (≤6 words). ' +
-        'If a hint is given after "=", use it as the primary synonym. ' +
-        'Return ONLY a JSON array, NO markdown, NO extra text:\n' +
-        '[{"word":"...","ipa":"...","synonyms":"...","vi":"..."}]\n\n' +
-        'Words:\n' + batch.map(function(p){ return p.word + (p.hint ? ' = ' + p.hint : ''); }).join('\n');
-
-      return fetch(GAS_URL + encodeURIComponent(apiKey), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: batchPrompt }] }],
-          generationConfig: { temperature: 0.1, maxOutputTokens: 2048 }
-        })
-      }).then(function(r){
-        if (!r.ok) return r.text().then(function(t){ throw new Error('Gemini ' + r.status + ': ' + t.slice(0,200)); });
-        return r.json();
-      }).then(function(d){
-        var text = ((((d.candidates||[])[0]||{}).content||{}).parts||[]).map(function(p){return p.text||'';}).join('');
-        text = text.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
-        // Auto-close truncated JSON
-        var open = (text.match(/\[/g)||[]).length - (text.match(/\]/g)||[]).length;
-        if (open > 0) text += ']';
-        return JSON.parse(text);
-      });
-    }
-
-    // Split into batches of 20, call sequentially
+    // ── Step 3: AI enrichment — IPA + Vietnamese ONLY (batch 30) ────
+    // Short prompt → small output → no truncation
+    var BATCH = 30;
+    var words = parsed.map(function(p){ return p.word; });
     var batches = [];
-    for (var b = 0; b < parsed.length; b += BATCH) {
-      batches.push(parsed.slice(b, b + BATCH));
+    for (var b = 0; b < words.length; b += BATCH) {
+      batches.push({ words: words.slice(b, b + BATCH), offset: b });
     }
 
-    var allResults = [];
-    function runBatch(idx) {
-      if (idx >= batches.length) {
-        // Merge results with original parsed order
-        return Promise.resolve(allResults.map(function(item, i) {
-          var orig = parsed[i] || {};
-          var syns = String(item.synonyms||'').split(',').map(function(s){return s.trim();}).filter(Boolean);
-          if (orig.hint && syns.indexOf(orig.hint) === -1) syns.unshift(orig.hint);
-          return { word: orig.word || item.word, ipa: item.ipa||'', synonyms: syns,
-                   vi: item.vi||'', meaningVi: item.vi||'' };
-        }));
+    // Model cascade: try newest first, fall back
+    var MODELS = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.0-flash-001'];
+
+    function callGemini(wordBatch) {
+      var prompt =
+        'You are a vocabulary dictionary. Return ONLY a valid JSON array, no markdown, no explanation.\n' +
+        'For EVERY word below, return exactly one object with:\n' +
+        '- "word": the word exactly as given\n' +
+        '- "ipa": British English IPA (e.g. /\u02c8w\u025c\u02d0d/)\n' +
+        '- "vi": concise Vietnamese translation (1-5 words)\n\n' +
+        'CRITICAL: Include ALL ' + wordBatch.length + ' words. No skipping.\n\n' +
+        'Words:\n' + wordBatch.join('\n') + '\n\n' +
+        'Return ONLY the JSON array.';
+
+      var modelIdx = 0;
+      function tryModel() {
+        if (modelIdx >= MODELS.length) return Promise.reject(new Error('All models failed'));
+        var model = MODELS[modelIdx++];
+        return fetch(
+          'https://generativelanguage.googleapis.com/v1beta/models/' + model +
+          ':generateContent?key=' + encodeURIComponent(apiKey),
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ role: 'user', parts: [{ text: prompt }] }],
+              generationConfig: { maxOutputTokens: 4096, temperature: 0.1 }
+            })
+          }
+        ).then(function(r) {
+          if (r.status === 429) {
+            return new Promise(function(res){ setTimeout(res, 3000); }).then(function(){
+              return tryModel();
+            });
+          }
+          if (!r.ok) return r.json().catch(function(){ return {}; }).then(function(e){
+            throw new Error((e.error && e.error.message) || 'HTTP ' + r.status + ' on ' + model);
+          });
+          return r.json();
+        }).then(function(d) {
+          var text = (((d.candidates||[])[0]||{}).content||{}).parts;
+          text = text ? text.map(function(p){ return p.text||''; }).join('') : '';
+          if (!text) throw new Error('Empty response from ' + model);
+          return text.trim();
+        }).catch(function(err) {
+          if (modelIdx < MODELS.length) return tryModel();
+          throw err;
+        });
       }
-      return callGemini(batches[idx]).then(function(arr){
-        allResults = allResults.concat(arr);
-        if (onProgress) onProgress(allResults.length, parsed.length);
-        // 500ms pause between batches to avoid rate limiting
-        return new Promise(function(res){ setTimeout(res, 500); }).then(function(){ return runBatch(idx + 1); });
+      return tryModel().then(function(raw) {
+        raw = raw.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+        // Robustly close truncated JSON
+        var opens  = (raw.match(/\{/g)||[]).length;
+        var closes = (raw.match(/\}/g)||[]).length;
+        if (opens > closes) {
+          // Close last object and array
+          raw = raw.replace(/,?\s*$/, '') + '}]';
+        }
+        if (!raw.endsWith(']')) raw = raw + ']';
+        return JSON.parse(raw);
       });
     }
 
-    return runBatch(0);
+    function runBatches(idx) {
+      if (idx >= batches.length) return Promise.resolve(result);
+      var b = batches[idx];
+      return callGemini(b.words).then(function(arr) {
+        arr.forEach(function(item, j) {
+          var ri = b.offset + j;
+          if (ri >= result.length) return;
+          if (item.ipa) result[ri].ipa = item.ipa;
+          if (item.vi)  { result[ri].vi = item.vi; result[ri].meaningVi = item.vi; }
+        });
+        if (onProgress) onProgress(b.offset + b.words.length, parsed.length);
+        // 600ms between batches to avoid rate limit
+        if (idx < batches.length - 1) {
+          return new Promise(function(res){ setTimeout(res, 600); }).then(function(){
+            return runBatches(idx + 1);
+          });
+        }
+        return result;
+      }).catch(function(err) {
+        console.warn('Batch ' + (idx+1) + ' failed:', err.message);
+        if (onProgress) onProgress(b.offset + b.words.length, parsed.length);
+        // Continue to next batch even on error
+        return runBatches(idx + 1);
+      });
+    }
+
+    return runBatches(0);
   };
+
 
   global.VM = VM;
 })(window);
