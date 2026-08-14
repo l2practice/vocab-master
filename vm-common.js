@@ -115,6 +115,38 @@
     set: function (k) { localStorage.setItem('vm_gemini_key', k || ''); },
   };
 
+  VM.groqKey = {
+    get: function () { return localStorage.getItem('vm_groq_key') || ''; },
+    set: function (k) { localStorage.setItem('vm_groq_key', k || ''); },
+  };
+
+  // Groq banner HTML helper — shown when all Gemini models fail and no Groq key saved
+  VM.groqBanner = function(containerId, onSave) {
+    var saved = VM.groqKey.get();
+    if (saved) { if(onSave) onSave(); return; }
+    var el = document.getElementById(containerId);
+    if(!el) return;
+    var div = document.createElement('div');
+    div.id = 'vmGroqBanner';
+    div.style.cssText = 'background:#FEF3D6;border:1.5px solid #F59E0B;border-radius:10px;padding:14px 16px;margin-bottom:14px';
+    div.innerHTML =
+      '<div style="font-weight:700;font-size:.88rem;color:#7A5000;margin-bottom:6px">⚠️ Gemini API không khả dụng</div>' +
+      '<p style="font-size:.8rem;color:#7A5000;margin:0 0 10px">Dùng Groq (miễn phí) thay thế. ' +
+        '<a href="https://console.groq.com/keys" target="_blank" style="color:var(--vm-primary);font-weight:600">Lấy Groq key →</a></p>' +
+      '<div style="display:flex;gap:8px">' +
+        '<input id="vmGroqKeyInput" type="password" placeholder="gsk_…" style="flex:1;border:1px solid #F59E0B;border-radius:7px;padding:7px 10px;font-size:.84rem;background:#fff">' +
+        '<button id="vmGroqSaveBtn" style="background:#F59E0B;color:#3A2600;border:none;border-radius:7px;padding:7px 12px;font-weight:700;font-size:.82rem;cursor:pointer">Lưu key</button>' +
+      '</div>';
+    el.insertBefore(div, el.firstChild);
+    document.getElementById('vmGroqSaveBtn').onclick = function(){
+      var k = (document.getElementById('vmGroqKeyInput').value||'').trim();
+      if(!k) return;
+      VM.groqKey.set(k);
+      div.remove();
+      if(onSave) onSave();
+    };
+  };
+
   /* ── Utilities ─────────────────────────────────────────────── */
   VM.el  = function (sel, root) { return (root || document).querySelector(sel); };
   VM.els = function (sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); };
@@ -384,7 +416,7 @@
     if(onProgress) onProgress(0,parsed.length);
 
     // Phase 2: AI enrichment — IPA + vi only, 30/batch
-    var BATCH=30, MODELS=['gemini-2.5-flash-lite','gemini-2.5-flash','gemini-2.0-flash-001'];
+    var BATCH=30, MODELS=['gemini-3.5-flash','gemini-3.1-flash-lite','gemini-3.6-flash'];
     var words=parsed.map(function(p){return p.word;});
     var batches=[];
     for(var b=0;b<words.length;b+=BATCH) batches.push({words:words.slice(b,b+BATCH),offset:b});
@@ -408,14 +440,37 @@
           var parts=(((d.candidates||[])[0]||{}).content||{}).parts||[];
           var text=parts.map(function(p){return p.text||'';}).join('').trim();
           if(!text) throw new Error('Empty response');
-          text=text.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+          text=text.replace(/```json[\n]?/g,'').replace(/```[\n]?/g,'').trim();
           var opens=(text.match(/\{/g)||[]).length,closes=(text.match(/\}/g)||[]).length;
           if(opens>closes) text=text.replace(/,?\s*$/,'')+'}]';
           if(!text.endsWith(']')) text+=']';
           return JSON.parse(text);
         }).catch(function(err){if(mi<MODELS.length)return tryModel();throw err;});
       }
-      return tryModel();
+      // Final fallback: Groq (llama-3.1-8b-instant)
+      function tryGroq(){
+        var groqKey = localStorage.getItem('vm_groq_key')||'';
+        if(!groqKey) return Promise.reject(new Error('NO_GROQ_KEY'));
+        return fetch('https://api.groq.com/openai/v1/chat/completions',{
+          method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+groqKey},
+          body:JSON.stringify({model:'llama-3.1-8b-instant',messages:[{role:'user',content:prompt}],temperature:0.1,max_tokens:4096})
+        }).then(function(r){
+          if(!r.ok) return r.json().catch(function(){return{};}).then(function(e){throw new Error((e.error&&e.error.message)||'Groq HTTP '+r.status);});
+          return r.json();
+        }).then(function(d){
+          var text=((d.choices||[])[0]||{}).message&&d.choices[0].message.content||'';
+          if(!text) throw new Error('Empty Groq response');
+          text=text.replace(/```json[\n]?/g,'').replace(/```[\n]?/g,'').trim();
+          var opens=(text.match(/\{/g)||[]).length,closes=(text.match(/\}/g)||[]).length;
+          if(opens>closes) text=text.replace(/,?\s*$/,'')+'}]';
+          if(!text.endsWith(']')) text+=']';
+          return JSON.parse(text);
+        });
+      }
+      return tryModel().catch(function(err){
+        if(err.message!=='NO_GROQ_KEY') return tryGroq().catch(function(){ throw err; });
+        throw err;
+      });
     }
 
     function runBatches(idx){
@@ -442,3 +497,367 @@
 
   global.VM = VM;
 })(window);
+
+/* ── AI Chat Widget ─────────────────────────────────────────────────
+   VM.Chat.init(opts) — mounts a floating chat button + panel
+   opts: {
+     role:        'student' | 'teacher',
+     context:     string — current assignment/article context for AI
+     systemExtra: string — extra system instructions
+   }
+   Student: Gemini 3.5-flash → 3.1-flash-lite → Groq llama
+   Teacher: user picks model from dropdown, stored in localStorage
+─────────────────────────────────────────────────────────────────── */
+VM.Chat = (function(){
+  var _open = false;
+  var _history = [];  // [{role:'user'|'assistant', content}]
+  var _context = '';
+  var _role = 'student';
+  var _mounted = false;
+
+  var STUDENT_MODELS = [
+    {id:'gemini-3.5-flash',      label:'Gemini 3.5 Flash',      type:'gemini'},
+    {id:'gemini-3.1-flash-lite', label:'Gemini 3.1 Flash Lite', type:'gemini'},
+    {id:'gemini-3.6-flash',      label:'Gemini 3.6 Flash',      type:'gemini'},
+    {id:'groq-llama',            label:'Groq Llama 3.1',        type:'groq'},
+  ];
+  var TEACHER_MODELS = [
+    {id:'gemini-3.5-flash',      label:'Gemini 3.5 Flash',      type:'gemini'},
+    {id:'gemini-3.1-flash-lite', label:'Gemini 3.1 Flash Lite', type:'gemini'},
+    {id:'gemini-3.6-flash',      label:'Gemini 3.6 Flash',      type:'gemini'},
+    {id:'groq-llama',            label:'Groq Llama 3.1',        type:'groq'},
+    {id:'gpt-4o-mini',           label:'GPT-4o Mini',           type:'openai'},
+    {id:'claude-3-5-haiku',      label:'Claude 3.5 Haiku',      type:'anthropic'},
+    {id:'grok-2',                label:'Grok 2',                type:'xai'},
+  ];
+
+  var STUDENT_SYSTEM =
+    'You are a helpful English learning assistant for Vietnamese EFL university students. ' +
+    'Your job is to explain vocabulary, grammar, and comprehension questions in a clear, encouraging way. ' +
+    'You can answer in Vietnamese if the student uses Vietnamese, or in English if they use English. ' +
+    'STRICT RULE: Never directly reveal quiz answers. If a student asks "what is the answer to question X" ' +
+    'or "is the answer Y?", gently redirect them to think through it: give a hint, explain the meaning, ' +
+    'or ask a guiding question instead. ' +
+    'Keep responses concise (2-4 sentences) unless a detailed explanation is needed.';
+
+  var TEACHER_SYSTEM =
+    'You are an expert English language teaching assistant for a Vietnamese university lecturer. ' +
+    'You can help with curriculum design, CLO/PLO alignment, teaching strategies, lesson planning, ' +
+    'assessment rubrics, student feedback, and EdTech tools. ' +
+    'Be direct, professional, and practical. Responses can be detailed when needed.';
+
+  function _systemPrompt(){
+    var base = _role === 'teacher' ? TEACHER_SYSTEM : STUDENT_SYSTEM;
+    if(_context) base += '\n\nCurrent context: ' + _context;
+    return base;
+  }
+
+  function _getModelKey(modelId){
+    return localStorage.getItem('vm_chat_key_' + modelId) || '';
+  }
+  function _setModelKey(modelId, key){
+    localStorage.setItem('vm_chat_key_' + modelId, key);
+  }
+  function _getSavedModel(){
+    return localStorage.getItem('vm_chat_model') || (_role==='teacher'?'gemini-3.5-flash':'auto');
+  }
+  function _setSavedModel(m){ localStorage.setItem('vm_chat_model', m); }
+
+  async function _callAI(messages, modelId){
+    var models = _role==='teacher' ? TEACHER_MODELS : STUDENT_MODELS;
+    var model  = models.find(function(m){return m.id===modelId;}) || models[0];
+
+    if(model.type === 'gemini'){
+      var key = VM.geminiKey.get();
+      if(!key) throw new Error('NO_GEMINI_KEY');
+      var msgs = [{role:'user', parts:[{text:_systemPrompt()}]}].concat(
+        messages.map(function(m){
+          return {role: m.role==='assistant'?'model':'user', parts:[{text:m.content}]};
+        })
+      );
+      var r = await fetch(
+        'https://generativelanguage.googleapis.com/v1beta/models/'+model.id+':generateContent?key='+encodeURIComponent(key),
+        {method:'POST',headers:{'Content-Type':'application/json'},
+         body:JSON.stringify({contents:msgs,generationConfig:{maxOutputTokens:1024,temperature:0.7}})}
+      );
+      if(!r.ok){var e=await r.json().catch(function(){return{};}); throw new Error((e.error&&e.error.message)||'Gemini HTTP '+r.status);}
+      var d = await r.json();
+      var parts = (((d.candidates||[])[0]||{}).content||{}).parts||[];
+      return parts.map(function(p){return p.text||'';}).join('').trim();
+    }
+
+    if(model.type === 'groq'){
+      var gk = VM.groqKey.get();
+      if(!gk) throw new Error('NO_GROQ_KEY');
+      var payload = {
+        model:'llama-3.1-8b-instant',
+        messages:[{role:'system',content:_systemPrompt()}].concat(messages),
+        temperature:0.7, max_tokens:1024
+      };
+      var r2 = await fetch('https://api.groq.com/openai/v1/chat/completions',
+        {method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+gk},
+         body:JSON.stringify(payload)});
+      if(!r2.ok){var e2=await r2.json().catch(function(){return{};}); throw new Error((e2.error&&e2.error.message)||'Groq HTTP '+r2.status);}
+      var d2 = await r2.json();
+      return ((d2.choices||[])[0]||{}).message&&d2.choices[0].message.content||'';
+    }
+
+    if(model.type === 'openai'){
+      var ok = _getModelKey(modelId);
+      if(!ok) throw new Error('NO_KEY:'+modelId);
+      var r3 = await fetch('https://api.openai.com/v1/chat/completions',
+        {method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+ok},
+         body:JSON.stringify({model:model.id,messages:[{role:'system',content:_systemPrompt()}].concat(messages),max_tokens:1024,temperature:0.7})});
+      if(!r3.ok){var e3=await r3.json().catch(function(){return{};}); throw new Error((e3.error&&e3.error.message)||'OpenAI HTTP '+r3.status);}
+      var d3 = await r3.json();
+      return ((d3.choices||[])[0]||{}).message&&d3.choices[0].message.content||'';
+    }
+
+    if(model.type === 'anthropic'){
+      var ck = _getModelKey(modelId);
+      if(!ck) throw new Error('NO_KEY:'+modelId);
+      var r4 = await fetch('https://api.anthropic.com/v1/messages',
+        {method:'POST',headers:{'Content-Type':'application/json','x-api-key':ck,'anthropic-version':'2023-06-01'},
+         body:JSON.stringify({model:'claude-3-5-haiku-20241022',system:_systemPrompt(),messages:messages,max_tokens:1024})});
+      if(!r4.ok){var e4=await r4.json().catch(function(){return{};}); throw new Error((e4.error&&e4.error.message)||'Claude HTTP '+r4.status);}
+      var d4 = await r4.json();
+      return ((d4.content||[])[0]||{}).text||'';
+    }
+
+    if(model.type === 'xai'){
+      var xk = _getModelKey(modelId);
+      if(!xk) throw new Error('NO_KEY:'+modelId);
+      var r5 = await fetch('https://api.x.ai/v1/chat/completions',
+        {method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+xk},
+         body:JSON.stringify({model:'grok-2-1212',messages:[{role:'system',content:_systemPrompt()}].concat(messages),max_tokens:1024,temperature:0.7})});
+      if(!r5.ok){var e5=await r5.json().catch(function(){return{};}); throw new Error((e5.error&&e5.error.message)||'Grok HTTP '+r5.status);}
+      var d5 = await r5.json();
+      return ((d5.choices||[])[0]||{}).message&&d5.choices[0].message.content||'';
+    }
+
+    throw new Error('Unknown model type: '+model.type);
+  }
+
+  // Student auto-cascade: try Gemini models → Groq
+  async function _sendStudent(userMsg){
+    var msgs = _history.concat([{role:'user',content:userMsg}]);
+    var cascade = ['gemini-3.5-flash','gemini-3.1-flash-lite','gemini-3.6-flash','groq-llama'];
+    for(var i=0; i<cascade.length; i++){
+      try {
+        return await _callAI(msgs, cascade[i]);
+      } catch(e) {
+        if(i===cascade.length-1) throw e;
+        // Continue to next model
+      }
+    }
+  }
+
+  async function _send(userMsg){
+    var modelId = _getSavedModel();
+    if(_role === 'student'){
+      return await _sendStudent(userMsg);
+    } else {
+      return await _callAI(_history.concat([{role:'user',content:userMsg}]), modelId);
+    }
+  }
+
+  function _renderMessages(){
+    var el = document.getElementById('vmChatMsgs');
+    if(!el) return;
+    el.innerHTML = _history.map(function(m){
+      var isUser = m.role==='user';
+      return '<div style="display:flex;justify-content:'+(isUser?'flex-end':'flex-start')+';margin-bottom:10px">'+
+        '<div style="max-width:82%;background:'+(isUser?'var(--vm-primary)':'var(--vm-surface-2)')+';'+
+          'color:'+(isUser?'#fff':'var(--vm-ink)')+';border-radius:'+(isUser?'16px 16px 4px 16px':'16px 16px 16px 4px')+';'+
+          'padding:10px 13px;font-size:.86rem;line-height:1.5;white-space:pre-wrap;word-break:break-word">'+
+          VM.esc(m.content)+
+        '</div>'+
+      '</div>';
+    }).join('') +
+    (_history.length===0?
+      '<div style="text-align:center;color:var(--vm-ink-3);font-size:.82rem;margin-top:20px">'+
+        (_role==='student'?'💬 Hỏi tôi về từ vựng, ngữ pháp, hay nội dung bài đọc!':'💬 Hỏi tôi bất cứ điều gì về giảng dạy!')+
+      '</div>':'');
+    el.scrollTop = el.scrollHeight;
+  }
+
+  function _requireKey(){
+    // Check if any usable key exists
+    var models = _role==='teacher' ? TEACHER_MODELS : STUDENT_MODELS;
+    var modelId = _getSavedModel();
+    if(_role==='student'||modelId==='auto') return true; // cascade handles it
+    var model = models.find(function(m){return m.id===modelId;});
+    if(!model) return true;
+    if(model.type==='gemini') return !!VM.geminiKey.get();
+    if(model.type==='groq') return !!VM.groqKey.get();
+    return !!_getModelKey(modelId);
+  }
+
+  function _keyInputFor(modelId){
+    var models = TEACHER_MODELS;
+    var model = models.find(function(m){return m.id===modelId;})||{type:'gemini'};
+    if(model.type==='gemini') return {label:'Gemini API Key', placeholder:'AIza…', get:VM.geminiKey.get, set:VM.geminiKey.set};
+    if(model.type==='groq')   return {label:'Groq API Key',   placeholder:'gsk_…', get:VM.groqKey.get,   set:VM.groqKey.set};
+    return {label:model.label+' API Key', placeholder:'sk-…',
+            get:function(){return _getModelKey(modelId);},
+            set:function(k){_setModelKey(modelId,k);}};
+  }
+
+  function _renderHeader(){
+    var models = _role==='teacher' ? TEACHER_MODELS : [];
+    var modelId = _getSavedModel();
+    return '<div style="background:var(--vm-primary-dk);color:#fff;padding:11px 14px;display:flex;align-items:center;gap:10px;border-radius:14px 14px 0 0">'+
+      '<div style="flex:1;font-weight:700;font-size:.9rem">'+(_role==='student'?'💬 AI Assistant':'💬 AI Teaching Assistant')+'</div>'+
+      (_role==='teacher'?
+        '<select id="vmChatModelSel" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:6px;padding:4px 8px;font-size:.75rem;font-family:inherit;cursor:pointer">'+
+          models.map(function(m){return '<option value="'+m.id+'" '+(m.id===modelId?'selected':'')+'>'+m.label+'</option>';}).join('')+
+        '</select>':'') +
+      '<button onclick="VM.Chat.toggle()" style="background:none;border:none;color:rgba(255,255,255,.7);font-size:1.2rem;cursor:pointer;padding:0;line-height:1">✕</button>'+
+    '</div>';
+  }
+
+  function _renderKeyPrompt(modelId){
+    var ki = _keyInputFor(modelId);
+    var saved = ki.get();
+    return saved ? '' :
+      '<div style="background:#FEF3D6;border-bottom:1px solid #F59E0B;padding:10px 12px;font-size:.78rem">'+
+        '<b style="color:#7A5000">'+ki.label+' required:</b> '+
+        '<div style="display:flex;gap:6px;margin-top:5px">'+
+          '<input id="vmChatKeyIn" type="password" placeholder="'+ki.placeholder+'" '+
+            'style="flex:1;border:1px solid #F59E0B;border-radius:6px;padding:5px 8px;font-size:.78rem">'+
+          '<button id="vmChatKeySave" style="background:#F59E0B;color:#3A2600;border:none;border-radius:6px;padding:5px 10px;font-weight:700;font-size:.76rem;cursor:pointer">Save</button>'+
+        '</div>'+
+      '</div>';
+  }
+
+  function mount(opts){
+    if(_mounted) {
+      // Just update context
+      _context = opts.context || _context;
+      return;
+    }
+    _role    = opts.role    || 'student';
+    _context = opts.context || '';
+    _history = [];
+    _mounted = true;
+
+    // Floating button
+    var btn = document.createElement('button');
+    btn.id = 'vmChatBtn';
+    btn.innerHTML = '💬';
+    btn.style.cssText = 'position:fixed;bottom:24px;right:20px;z-index:7000;width:52px;height:52px;'+
+      'border-radius:50%;background:var(--vm-primary);color:#fff;border:none;font-size:1.4rem;'+
+      'cursor:pointer;box-shadow:0 4px 20px rgba(27,127,94,.4);transition:transform .15s;line-height:1;'+
+      'display:flex;align-items:center;justify-content:center';
+    btn.title = 'AI Assistant';
+    btn.onclick = function(){ VM.Chat.toggle(); };
+    document.body.appendChild(btn);
+
+    // Chat panel
+    var panel = document.createElement('div');
+    panel.id = 'vmChatPanel';
+    panel.style.cssText = 'position:fixed;bottom:86px;right:20px;z-index:7000;width:340px;max-height:520px;'+
+      'display:none;flex-direction:column;background:var(--vm-surface);border-radius:14px;'+
+      'box-shadow:0 12px 40px rgba(0,0,0,.25);overflow:hidden;border:1px solid var(--vm-border-2)';
+    document.body.appendChild(panel);
+  }
+
+  function _rebuildPanel(){
+    var panel = document.getElementById('vmChatPanel');
+    if(!panel) return;
+    var modelId = _getSavedModel();
+    panel.innerHTML =
+      _renderHeader()+
+      _renderKeyPrompt(modelId)+
+      '<div id="vmChatMsgs" style="flex:1;overflow-y:auto;padding:12px;min-height:200px;max-height:340px"></div>'+
+      '<div style="border-top:1px solid var(--vm-border-2);padding:10px 12px;display:flex;gap:8px;background:var(--vm-surface)">'+
+        '<input id="vmChatInput" placeholder="Hỏi AI…" autocomplete="off" '+
+          'style="flex:1;border:1.5px solid var(--vm-border);border-radius:20px;padding:8px 14px;font-size:.85rem;font-family:inherit;outline:none">'+
+        '<button id="vmChatSend" style="background:var(--vm-primary);color:#fff;border:none;border-radius:50%;width:36px;height:36px;cursor:pointer;font-size:1rem;flex:0 0 auto">↑</button>'+
+      '</div>';
+
+    _renderMessages();
+
+    // Model selector change (teacher)
+    var sel = document.getElementById('vmChatModelSel');
+    if(sel) sel.onchange = function(){
+      _setSavedModel(sel.value);
+      _rebuildPanel();
+    };
+
+    // Key save
+    var kSave = document.getElementById('vmChatKeySave');
+    if(kSave) kSave.onclick = function(){
+      var v = (document.getElementById('vmChatKeyIn').value||'').trim();
+      if(!v){ VM.toast('Enter API key.','warn'); return; }
+      var ki = _keyInputFor(_getSavedModel());
+      ki.set(v);
+      _rebuildPanel();
+      VM.toast('Key saved!','ok');
+    };
+
+    // Send
+    var inp = document.getElementById('vmChatInput');
+    var sendBtn = document.getElementById('vmChatSend');
+
+    async function doSend(){
+      if(!inp) return;
+      var msg = inp.value.trim();
+      if(!msg) return;
+      inp.value = '';
+      inp.disabled = true;
+      sendBtn.disabled = true;
+      sendBtn.innerHTML = '<span class="vm-spin" style="width:14px;height:14px;border-width:2px"></span>';
+
+      _history.push({role:'user', content:msg});
+      _renderMessages();
+
+      try {
+        var reply = await _send(msg);
+        _history.push({role:'assistant', content:reply});
+      } catch(e) {
+        var em = e.message||String(e);
+        if(em.startsWith('NO_KEY:')){
+          var mid = em.slice(7);
+          _history.push({role:'assistant', content:'⚠️ Please enter your '+mid+' API key above to continue.'});
+        } else if(em==='NO_GEMINI_KEY'){
+          _history.push({role:'assistant', content:'⚠️ No Gemini API key. Please add a key in Settings, or select Groq in the model dropdown.'});
+        } else if(em==='NO_GROQ_KEY'){
+          _history.push({role:'assistant', content:'⚠️ No Groq key saved. Get a free key at https://console.groq.com/keys and enter it in the ReadWise page.'});
+        } else {
+          _history.push({role:'assistant', content:'❌ Error: '+em});
+        }
+      }
+
+      inp.disabled = false;
+      sendBtn.disabled = false;
+      sendBtn.innerHTML = '↑';
+      _renderMessages();
+      if(inp) inp.focus();
+    }
+
+    if(inp) inp.onkeydown = function(e){ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); doSend(); } };
+    if(sendBtn) sendBtn.onclick = doSend;
+  }
+
+  return {
+    init: function(opts){
+      mount(opts);
+      _rebuildPanel();
+    },
+    setContext: function(ctx){ _context = ctx||''; },
+    toggle: function(){
+      _open = !_open;
+      var panel = document.getElementById('vmChatPanel');
+      var btn   = document.getElementById('vmChatBtn');
+      if(panel) panel.style.display = _open ? 'flex' : 'none';
+      if(btn)   btn.innerHTML = _open ? '✕' : '💬';
+      if(_open){ _rebuildPanel(); var i=document.getElementById('vmChatInput'); if(i) setTimeout(function(){i.focus();},50); }
+    },
+    destroy: function(){
+      _mounted=false; _history=[];
+      var p=document.getElementById('vmChatPanel'); if(p) p.remove();
+      var b=document.getElementById('vmChatBtn');   if(b) b.remove();
+    }
+  };
+})();

@@ -167,7 +167,8 @@ VM.renderShell({
     {id:'homework',label:'Homework',      icon:'hw'},
     {id:'inclass', label:'In-class',      icon:'inclass'},
     {id:'reading', label:'ReadWise',      icon:'reading'},
-    {id:'history', label:'History',       icon:'results'},
+    {id:'history',  label:'History',       icon:'results'},
+    {id:'settings', label:'Settings',      icon:'edit'},
   ],
   onNav: switchTab
 });
@@ -175,7 +176,7 @@ VM.renderShell({
 function switchTab(id){
   S.activeTab=id;
   VM.setActiveNav(id);
-  var titles={home:'Home',homework:'Homework',inclass:'In-class Review',reading:'ReadWise',history:'History'};
+  var titles={home:'Home',homework:'Homework',inclass:'In-class Review',reading:'ReadWise',history:'History',settings:'Settings'};
   VM.setTitle(titles[id]||id);
   var c=document.getElementById('vmContent');
   c.innerHTML='<div class="vm-empty" style="padding:40px"><span class="vm-spin-dark" style="width:22px;height:22px;border-width:3px"></span></div>';
@@ -183,6 +184,7 @@ function switchTab(id){
   else if(id==='homework') renderAssignList('homework');
   else if(id==='inclass')  renderAssignList('inclass');
   else if(id==='reading')  renderReadWise();
+  else if(id==='settings') renderSettings();
   else if(id==='history'){
     // Pre-load assignments so retry buttons work
     if(!S.assignments.length) loadAssignments(function(){ renderHistory(); });
@@ -748,7 +750,7 @@ function analyseAndSaveArticle(){
     '[{"phrase":"...","meaning":"Vietnamese meaning"}]\n\n'+
     'Passage:\n'+passage.slice(0,2000);
 
-  var MODELS=['gemini-2.5-flash-lite','gemini-2.5-flash'];
+  var MODELS=['gemini-3.5-flash','gemini-3.1-flash-lite','gemini-3.6-flash'];
 
   function callGemini(prompt, parseArr){
     var mi=0;
@@ -773,7 +775,21 @@ function analyseAndSaveArticle(){
         return JSON.parse(text);
       }).catch(function(err){if(mi<MODELS.length)return tryM();throw err;});
     }
-    return tryM();
+    // Groq fallback after all Gemini models fail
+    function tryGroqRW(p){
+      var gk=localStorage.getItem('vm_groq_key')||'';
+      if(!gk) return Promise.reject(new Error('NO_GROQ_KEY'));
+      return fetch('https://api.groq.com/openai/v1/chat/completions',{
+        method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+gk},
+        body:JSON.stringify({model:'llama-3.1-8b-instant',messages:[{role:'user',content:p}],temperature:0.1,max_tokens:4096})
+      }).then(function(r){return r.json();}).then(function(d){
+        var text=((d.choices||[])[0]||{}).message&&d.choices[0].message.content||'';
+        text=text.replace(/```json[\n]?/g,'').replace(/```[\n]?/g,'').trim();
+        if(!text.endsWith(']')) text+=']';
+        return JSON.parse(text);
+      });
+    }
+    return tryM().catch(function(){ return tryGroqRW(prompt); });
   }
 
   var vocabResult=[], collocResult=[];
@@ -813,8 +829,39 @@ function analyseAndSaveArticle(){
     }
   }).catch(function(err){
     btn.disabled=false;
-    status.textContent='❌ Lỗi: '+(err.message||err);
-    VM.toast('Error: '+(err.message||err),'err',5000);
+    var msg = err.message||String(err);
+    // If all Gemini models failed AND no Groq key → show banner
+    var hasGroq = localStorage.getItem('vm_groq_key');
+    if(!hasGroq){
+      status.innerHTML = '❌ Gemini không khả dụng. '+
+        '<a href="https://console.groq.com/keys" target="_blank" style="color:var(--vm-primary);font-weight:700">Lấy Groq key miễn phí →</a>';
+      var banner = document.createElement('div');
+      banner.id='vmGroqBanner';
+      banner.style.cssText='background:#FEF3D6;border:1.5px solid #F59E0B;border-radius:10px;padding:14px 16px;margin-top:10px';
+      banner.innerHTML=
+        '<div style="font-weight:700;font-size:.88rem;color:#7A5000;margin-bottom:6px">⚠️ Tất cả Gemini model đều thất bại</div>'+
+        '<p style="font-size:.8rem;color:#7A5000;margin:0 0 10px">Dùng Groq (llama-3.1) miễn phí để thay thế. '+
+          '<a href="https://console.groq.com/keys" target="_blank" style="color:var(--vm-primary);font-weight:600">Lấy Groq key →</a></p>'+
+        '<div style="display:flex;gap:8px">'+
+          '<input id="rwGroqIn" type="password" placeholder="gsk_…" '+
+            'style="flex:1;border:1px solid #F59E0B;border-radius:7px;padding:7px 10px;font-size:.84rem;background:#fff">'+
+          '<button id="rwGroqSave" style="background:#F59E0B;color:#3A2600;border:none;border-radius:7px;padding:7px 12px;font-weight:700;font-size:.82rem;cursor:pointer">Lưu & Thử lại</button>'+
+        '</div>';
+      var statusEl = document.getElementById('rwAnalyseStatus');
+      if(statusEl) statusEl.after(banner);
+      var saveBtn = document.getElementById('rwGroqSave');
+      if(saveBtn) saveBtn.onclick=function(){
+        var k=(document.getElementById('rwGroqIn').value||'').trim();
+        if(!k){VM.toast('Nhập Groq key.','warn');return;}
+        localStorage.setItem('vm_groq_key',k);
+        banner.remove();
+        VM.toast('Groq key saved! Thử lại...','ok');
+        document.getElementById('rwAnalyseBtn').click();
+      };
+    } else {
+      status.textContent='❌ Lỗi: '+msg;
+      VM.toast('Error: '+msg,'err',5000);
+    }
   });
 }
 
@@ -1259,7 +1306,163 @@ var mcs=document.createElement('style');
 mcs.textContent='.vm-mode-chip{padding:6px 14px;border:1.5px solid var(--vm-border);border-radius:var(--vm-r-pill);font-size:.82rem;font-weight:600;cursor:pointer;background:var(--vm-surface);color:var(--vm-ink-2);font-family:var(--vm-font-body);transition:all .14s}.vm-mode-chip.active{background:var(--vm-primary);color:#fff;border-color:var(--vm-primary)}';
 document.head.appendChild(mcs);
 
+/* ── Settings ───────────────────────────────────── */
+function renderSettings(){
+  var c = document.getElementById('vmContent');
+  var gemKey = VM.geminiKey.get();
+  var groqKey = VM.groqKey.get();
+
+  c.innerHTML =
+    // ── Profile section ──
+    '<div class="vm-card" style="padding:22px 24px;margin-bottom:16px">'+
+      '<h3 style="font-family:var(--vm-font-display);font-size:1rem;font-weight:700;margin:0 0 16px;color:var(--vm-ink)">👤 Profile</h3>'+
+      '<div style="display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:.88rem;color:var(--vm-ink-2);margin-bottom:16px">'+
+        '<b>Name</b><span>'+VM.esc(sess.name||'—')+'</span>'+
+        '<b>Student ID</b><span>'+VM.esc(sess.studentId||'—')+'</span>'+
+        '<b>Class</b><span>'+VM.esc(sess.class||'—')+'</span>'+
+        '<b>Email</b><span>'+VM.esc(sess.email||'—')+'</span>'+
+      '</div>'+
+    '</div>'+
+
+    // ── Change Password ──
+    '<div class="vm-card" style="padding:22px 24px;margin-bottom:16px">'+
+      '<h3 style="font-family:var(--vm-font-display);font-size:1rem;font-weight:700;margin:0 0 16px;color:var(--vm-ink)">🔐 Change Password</h3>'+
+      '<div class="vm-field">'+
+        '<label class="vm-label">Current Password</label>'+
+        '<input class="vm-input" id="stOldPw" type="password" placeholder="••••••••">'+
+      '</div>'+
+      '<div class="vm-field">'+
+        '<label class="vm-label">New Password</label>'+
+        '<input class="vm-input" id="stNewPw" type="password" placeholder="Min 6 characters">'+
+      '</div>'+
+      '<div class="vm-field">'+
+        '<label class="vm-label">Confirm New Password</label>'+
+        '<input class="vm-input" id="stConfPw" type="password" placeholder="Repeat new password">'+
+      '</div>'+
+      '<div id="stPwMsg" style="font-size:.8rem;min-height:18px;margin-bottom:10px"></div>'+
+      '<button class="vm-btn vm-btn-primary" id="stChangePwBtn" style="padding:10px 22px">Save Password</button>'+
+    '</div>'+
+
+    // ── API Keys ──
+    '<div class="vm-card" style="padding:22px 24px;margin-bottom:16px">'+
+      '<h3 style="font-family:var(--vm-font-display);font-size:1rem;font-weight:700;margin:0 0 4px;color:var(--vm-ink)">🔑 AI API Keys</h3>'+
+      '<p style="font-size:.78rem;color:var(--vm-ink-3);margin:0 0 16px">Keys are saved locally on this device only — never sent to any server.</p>'+
+
+      // Gemini
+      '<div class="vm-field">'+
+        '<label class="vm-label" style="display:flex;align-items:center;justify-content:space-between">'+
+          '<span>Gemini API Key <span style="font-size:.7rem;font-weight:400;color:var(--vm-ink-3)">(Google AI Studio — miễn phí)</span></span>'+
+          '<a href="https://aistudio.google.com/apikey" target="_blank" style="font-size:.75rem;color:var(--vm-primary);font-weight:600">Lấy key →</a>'+
+        '</label>'+
+        '<div style="display:flex;gap:8px">'+
+          '<input class="vm-input" id="stGemKey" type="password" placeholder="AIza…" value="'+VM.esc(gemKey)+'" style="flex:1">'+
+          '<button class="vm-btn vm-btn-ghost" id="stGemSave" style="padding:10px 16px;white-space:nowrap">Save</button>'+
+          (gemKey?'<button class="vm-btn vm-btn-ghost" id="stGemClear" style="padding:10px 12px;color:var(--vm-danger)">✕</button>':'')+ 
+        '</div>'+
+        '<div id="stGemStatus" style="font-size:.75rem;margin-top:5px;min-height:16px">'+
+          (gemKey?'<span style="color:var(--vm-ok)">✓ Key saved</span>':'<span style="color:var(--vm-ink-3)">No key — using Groq fallback</span>')+
+        '</div>'+
+      '</div>'+
+
+      // Groq
+      '<div class="vm-field" style="margin-top:4px">'+
+        '<label class="vm-label" style="display:flex;align-items:center;justify-content:space-between">'+
+          '<span>Groq API Key <span style="font-size:.7rem;font-weight:400;color:var(--vm-ink-3)">(Groq console — miễn phí)</span></span>'+
+          '<a href="https://console.groq.com/keys" target="_blank" style="font-size:.75rem;color:var(--vm-primary);font-weight:600">Lấy key →</a>'+
+        '</label>'+
+        '<div style="display:flex;gap:8px">'+
+          '<input class="vm-input" id="stGroqKey" type="password" placeholder="gsk_…" value="'+VM.esc(groqKey)+'" style="flex:1">'+
+          '<button class="vm-btn vm-btn-ghost" id="stGroqSave" style="padding:10px 16px;white-space:nowrap">Save</button>'+
+          (groqKey?'<button class="vm-btn vm-btn-ghost" id="stGroqClear" style="padding:10px 12px;color:var(--vm-danger)">✕</button>':'')+
+        '</div>'+
+        '<div id="stGroqStatus" style="font-size:.75rem;margin-top:5px;min-height:16px">'+
+          (groqKey?'<span style="color:var(--vm-ok)">✓ Key saved (Groq fallback active)</span>':'<span style="color:var(--vm-ink-3)">No key</span>')+
+        '</div>'+
+      '</div>'+
+    '</div>'+
+
+    // ── Session ──
+    '<div class="vm-card" style="padding:22px 24px">'+
+      '<h3 style="font-family:var(--vm-font-display);font-size:1rem;font-weight:700;margin:0 0 8px;color:var(--vm-ink)">🔓 Session</h3>'+
+      '<p style="font-size:.82rem;color:var(--vm-ink-2);margin:0 0 14px">Auto sign-out after 45 minutes of inactivity.</p>'+
+      '<button class="vm-btn vm-btn-danger" id="stSignOutBtn" style="padding:10px 20px">Sign out</button>'+
+    '</div>';
+
+  // ── Wire up handlers ──
+
+  // Change password
+  document.getElementById('stChangePwBtn').onclick = function(){
+    var old = document.getElementById('stOldPw').value;
+    var nw  = document.getElementById('stNewPw').value;
+    var cf  = document.getElementById('stConfPw').value;
+    var msg = document.getElementById('stPwMsg');
+    if(!old||!nw||!cf){ msg.style.color='var(--vm-danger)'; msg.textContent='Fill in all fields.'; return; }
+    if(nw.length<6){     msg.style.color='var(--vm-danger)'; msg.textContent='New password must be at least 6 characters.'; return; }
+    if(nw!==cf){         msg.style.color='var(--vm-danger)'; msg.textContent='Passwords do not match.'; return; }
+    var btn=document.getElementById('stChangePwBtn');
+    btn.disabled=true; btn.textContent='Saving…';
+    VM.api('auth.changePassword',{studentId:sess.studentId, oldPass:old, newPass:nw}).then(function(res){
+      btn.disabled=false; btn.textContent='Save Password';
+      if(res&&res.success){
+        msg.style.color='var(--vm-ok)'; msg.textContent='✓ Password changed successfully.';
+        document.getElementById('stOldPw').value='';
+        document.getElementById('stNewPw').value='';
+        document.getElementById('stConfPw').value='';
+      } else {
+        msg.style.color='var(--vm-danger)'; msg.textContent=(res&&res.error)||'Error changing password.';
+      }
+    }).catch(function(){ btn.disabled=false; btn.textContent='Save Password'; msg.style.color='var(--vm-danger)'; msg.textContent='Connection error.'; });
+  };
+
+  // Gemini key save
+  document.getElementById('stGemSave').onclick = function(){
+    var k=(document.getElementById('stGemKey').value||'').trim();
+    VM.geminiKey.set(k);
+    var st=document.getElementById('stGemStatus');
+    if(k){ st.innerHTML='<span style="color:var(--vm-ok)">✓ Key saved</span>'; VM.toast('Gemini key saved.','ok'); }
+    else { st.innerHTML='<span style="color:var(--vm-ink-3)">Cleared</span>'; VM.toast('Gemini key cleared.','ok'); }
+  };
+  var gclear=document.getElementById('stGemClear');
+  if(gclear) gclear.onclick=function(){
+    document.getElementById('stGemKey').value='';
+    VM.geminiKey.set('');
+    document.getElementById('stGemStatus').innerHTML='<span style="color:var(--vm-ink-3)">Cleared</span>';
+    VM.toast('Gemini key cleared.','ok');
+  };
+
+  // Groq key save
+  document.getElementById('stGroqSave').onclick = function(){
+    var k=(document.getElementById('stGroqKey').value||'').trim();
+    VM.groqKey.set(k);
+    var st=document.getElementById('stGroqStatus');
+    if(k){ st.innerHTML='<span style="color:var(--vm-ok)">✓ Key saved (Groq fallback active)</span>'; VM.toast('Groq key saved.','ok'); }
+    else { st.innerHTML='<span style="color:var(--vm-ink-3)">Cleared</span>'; VM.toast('Groq key cleared.','ok'); }
+  };
+  var grClear=document.getElementById('stGroqClear');
+  if(grClear) grClear.onclick=function(){
+    document.getElementById('stGroqKey').value='';
+    VM.groqKey.set('');
+    document.getElementById('stGroqStatus').innerHTML='<span style="color:var(--vm-ink-3)">Cleared</span>';
+    VM.toast('Groq key cleared.','ok');
+  };
+
+  // Sign out
+  document.getElementById('stSignOutBtn').onclick=function(){ VM.session.logout(); };
+}
+
 /* ── Boot ─────────────────────────────────────── */
+// Init AI chat — student mode, auto-cascade Gemini→Groq, no answer spoiling
+VM.Chat.init({ role:'student', context:'' });
+
+// Update chat context when student enters homework or readwise
+var _origSwitchTab = switchTab;
+switchTab = function(id){
+  _origSwitchTab(id);
+  if(id==='homework') VM.Chat.setContext('Student is studying homework vocabulary assignments.');
+  else if(id==='reading') VM.Chat.setContext('Student is using ReadWise self-study reading mode.');
+  else VM.Chat.setContext('');
+};
+
 switchTab('home');
 </script>
 </body>
