@@ -66,6 +66,22 @@
 .timer-info{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;font-size:.82rem;color:var(--vm-ink-2);font-weight:600}
 
 /* Quiz */
+/* Prominent question prompt — serif, large, centered */
+.vm-quiz-prompt-box{
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1.55rem;
+  font-weight: 700;
+  color: var(--vm-ink);
+  text-align: center;
+  line-height: 1.4;
+  margin: 0 0 24px;
+  padding: 18px 16px 20px;
+  background: linear-gradient(135deg, #F0FDF8, #E8F5FF);
+  border-radius: 12px;
+  border: 2px solid rgba(27,127,94,.18);
+  letter-spacing: -.01em;
+  word-break: break-word;
+}
 .vm-quiz-options{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .vm-opt{background:var(--vm-surface-2);border:2px solid var(--vm-border);border-radius:var(--vm-r-sm);padding:14px 16px;cursor:pointer;font-size:.93rem;font-weight:500;transition:border .15s,background .15s;text-align:center;font-family:var(--vm-font-body);-webkit-tap-highlight-color:transparent}
 .vm-opt:active{transform:scale(.97)}
@@ -416,8 +432,7 @@ function renderQ(){
         '<span style="font-size:.8rem;color:var(--vm-ink-3)">✓ '+qs.correct+'</span>'+
       '</div>'+
       '<div class="vm-quiz-card">'+
-        (q.ipa?'<div style="font-family:monospace;font-size:.85rem;color:var(--vm-ink-3);margin-bottom:6px">/'+VM.esc(q.ipa)+'/</div>':'')+
-        '<div class="vm-quiz-q">'+VM.esc(q.prompt)+'</div>'+
+        '<div class="vm-quiz-prompt-box">'+VM.esc(q.prompt)+'</div>'+
         (isFITB?renderFITB(q):renderMC(q))+
       '</div>'+
     '</div>';
@@ -435,10 +450,10 @@ function renderMC(q){
 }
 
 function renderFITB(q){
-  return '<div style="background:linear-gradient(135deg,#EFF6FF,#E0EFFE);border-radius:10px;border:1.5px solid #BFDBFE;padding:14px 18px;margin-bottom:14px;font-size:1rem;line-height:1.8">'+
-      q.sentence.replace('_______','<span style="display:inline-block;min-width:90px;border-bottom:2px solid #1B7F5E;padding:0 6px;font-weight:700;color:var(--vm-primary);font-family:monospace">_______</span>')+
+  return '<div class="vm-quiz-prompt-box" style="font-family:var(--vm-font-body);font-size:1.1rem;font-weight:500;background:linear-gradient(135deg,#EFF6FF,#E0EFFE);border-color:rgba(59,130,246,.25)">'+
+      q.sentence.replace('_______','<span style="display:inline-block;min-width:90px;border-bottom:3px solid #1B7F5E;padding:0 8px;font-weight:700;color:var(--vm-primary);font-family:monospace;font-size:1.2rem">_______</span>')+
     '</div>'+
-    '<div style="font-size:.78rem;color:var(--vm-ink-3);margin-bottom:10px;text-align:center">First letter: <b style="font-family:monospace;font-size:1rem">'+q.firstLetter+'</b> · '+q.wordLen+' letters</div>'+
+    '<div style="font-size:.78rem;color:var(--vm-ink-3);margin-bottom:10px;text-align:center">First letter: <b style="font-family:monospace;font-size:1.1rem;color:var(--vm-primary)">'+q.firstLetter+'</b> · '+q.wordLen+' letters</div>'+
     '<input class="vm-quiz-input" id="qFitbInput" placeholder="Type the word…" autocomplete="off" spellcheck="false" maxlength="'+(q.wordLen+5)+'">'+
     '<div class="vm-quiz-fb" id="qFb"></div>'+
     '<button class="vm-btn vm-btn-primary vm-quiz-submit" id="qSubmit" style="margin-top:12px" disabled>Confirm</button>';
