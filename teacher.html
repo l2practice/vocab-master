@@ -221,6 +221,13 @@ function showOverlay(msg){
 }
 function hideOverlay(){ document.getElementById('globalOverlay').classList.remove('show'); }
 
+  // Resolve classId → className (falls back to classId if not loaded yet)
+  function clsName(id) {
+    if (!id) return '—';
+    var c = (state.classes||[]).find(function(c){ return c.classId === String(id); });
+    return c ? c.className : String(id);
+  }
+
 var state = {
   classes: [],
   assignments: [],
@@ -351,7 +358,7 @@ function recentResultsTable() {
     rows.map(function(r){
       return '<tr><td>'+VM.esc(VM.fmtDate(r.timestamp))+'</td>' +
              '<td>'+VM.esc(r.name)+'<br><small style="color:var(--vm-ink-3)">'+VM.esc(r.studentId)+'</small></td>' +
-             '<td>'+VM.esc(r.class)+'</td>' +
+             '<td>'+VM.esc(clsName(r.class))+'</td>' +
              '<td>'+VM.esc(r.title||r.assignmentId)+'</td>' +
              '<td class="vm-score '+scoreClass(r.score)+'">'+r.score+'%</td></tr>';
     }).join('') +
@@ -423,7 +430,7 @@ document.getElementById('classSaveBtn').onclick = function(){
     teacherEmail:sess.email
   }).then(function(res){
     if(res&&res.success){
-      VM.toast('Class created: '+res.data.classId,'ok');
+      VM.toast('Class created: '+name,'ok');
       document.getElementById('classModal').classList.remove('show');
       loadClasses(function(){renderClasses();});
     } else VM.toast('Error: '+(res&&res.error),'err',4000);
@@ -431,7 +438,8 @@ document.getElementById('classSaveBtn').onclick = function(){
 };
 
 function openRoster(classId) {
-  document.getElementById('rosterTitle').textContent = 'Roster — ' + classId;
+  var rCls = state.classes.find(function(c){return c.classId===classId;});
+  document.getElementById('rosterTitle').textContent = 'Roster — ' + (rCls?rCls.className:classId);
   document.getElementById('rosterContent').innerHTML = '<div class="vm-empty"><p>Loading…</p></div>';
   document.getElementById('rosterModal').classList.add('show');
   VM.api('class.roster',{classId:classId}).then(function(res){
@@ -530,7 +538,7 @@ function renderAssignList() {
       var modeLabel = a.mode==='homework'?'📝 Homework':'🖥️ In-class';
       return '<tr>' +
         '<td><b>'+VM.esc(a.title)+'</b></td>' +
-        '<td>'+VM.esc(a.classId)+'</td>' +
+        '<td>'+VM.esc(clsName(a.classId))+'</td>' +
         '<td>'+modeLabel+'</td>' +
         '<td>'+(a.deadline?VM.esc(a.deadline):'∞')+'</td>' +
         '<td>'+(a.mode==='homework'?a.requiredGoals:'—')+'</td>' +
@@ -1038,7 +1046,7 @@ function _renderResultsUI() {
           '<td style="font-size:.8rem">'+VM.esc(VM.fmtDate(r.timestamp))+'</td>' +
           '<td>'+VM.esc(r.studentId)+'</td>' +
           '<td>'+VM.esc(r.name)+'</td>' +
-          '<td>'+VM.esc(r.class)+'</td>' +
+          '<td>'+VM.esc(clsName(r.class))+'</td>' +
           '<td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+VM.esc(r.title||r.assignmentId)+'">'+VM.esc(r.title||r.assignmentId)+'</td>' +
           '<td>'+(r.mode==='homework'?'📝':'🖥️')+' '+VM.esc(r.mode||'')+'</td>' +
           '<td class="vm-score '+scoreClass(r.score)+'">'+r.score+'%</td>' +
@@ -1179,7 +1187,7 @@ function renderHWBook(){
           var modeColor = a.mode==='homework'?'var(--vm-primary)':'#8B5CF6';
           var wc = (a.vocab||[]).length;
           var cls = state.classes.find(function(cl){return cl.classId===a.classId;});
-          var clsName = cls?cls.className:a.classId;
+          var clsDisplayed = cls?cls.className:a.classId;
           // Completion stats from results
           var aResults = state.results.filter(function(r){return r.assignmentId===a.assignmentId;});
           var submittedSet = {};
@@ -1190,7 +1198,7 @@ function renderHWBook(){
               '<b style="font-size:.88rem">'+VM.esc(a.title)+'</b>'+
             '</td>'+
             '<td><span style="color:'+modeColor+';font-weight:600;font-size:.82rem">'+modeLabel+'</span></td>'+
-            '<td style="font-size:.82rem">'+VM.esc(clsName)+'</td>'+
+            '<td style="font-size:.82rem">'+VM.esc(clsDisplayed)+'</td>'+
             '<td style="font-size:.82rem">'+wc+' words</td>'+
             '<td style="font-size:.82rem">'+(a.deadline||'∞')+'</td>'+
             (a.mode==='inclass'?
