@@ -74,6 +74,25 @@
           <input class="vm-input" id="af-deadline" type="date">
         </div>
       </div>
+      <!-- In-class only: session time -->
+      <div id="af-inclass-time-wrap" style="display:none">
+        <div class="vm-row" style="gap:14px;flex-wrap:wrap">
+          <div class="vm-field" style="flex:1;min-width:160px">
+            <label class="vm-label">Session Start Time <span style="color:var(--vm-danger)">*</span></label>
+            <input class="vm-input" id="af-session-start" type="datetime-local">
+            <p style="font-size:.74rem;color:var(--vm-ink-3);margin:4px 0 0">When students can start the in-class quiz.</p>
+          </div>
+          <div class="vm-field" style="flex:1;min-width:140px">
+            <label class="vm-label">Duration (minutes) <span style="color:var(--vm-danger)">*</span></label>
+            <input class="vm-input" id="af-duration" type="number" min="5" max="180" value="45" placeholder="45">
+            <p style="font-size:.74rem;color:var(--vm-ink-3);margin:4px 0 0">Session ends at start + duration.</p>
+          </div>
+          <div class="vm-field" style="flex:1;min-width:140px">
+            <label class="vm-label">Session End (auto)</label>
+            <input class="vm-input" id="af-session-end" type="datetime-local" disabled style="opacity:.5">
+          </div>
+        </div>
+      </div>
       <div id="af-goals-wrap" class="vm-field">
         <label class="vm-label">Required Perfect Scores (Goal)</label>
         <input class="vm-input" id="af-goals" type="number" min="1" max="20" value="3" style="max-width:120px">
@@ -228,7 +247,7 @@ VM.renderShell({
 function switchTab(id) {
   state.activeTab = id;
   VM.setActiveNav(id);
-  var titles = { overview:'Overview', classes:'Classes', assign:'Assignments', results:'Results' };
+  var titles = { overview:'Overview', classes:'Classes', assign:'Assignments', hwbook:'HW Book', results:'Results' };
   VM.setTitle(titles[id] || id);
   var content = document.getElementById('vmContent');
   content.innerHTML = '<div class="vm-empty"><span class="vm-spin-dark" style="width:24px;height:24px;border-width:3px"></span></div>';
@@ -236,6 +255,7 @@ function switchTab(id) {
   if (id === 'overview') renderOverview();
   else if (id === 'classes')  renderClasses();
   else if (id === 'assign')   renderAssignments();
+  else if (id === 'hwbook')   renderHWBook();
   else if (id === 'results')  renderResults(false);
 }
 
@@ -608,9 +628,26 @@ function toggleLoadFromHW(){
 }
 
 function toggleGoalsField(){
-  var isHw = document.getElementById('af-mode').value === 'homework';
+  var mode = document.getElementById('af-mode').value;
+  var isHw = mode === 'homework';
+  var isIC = mode === 'inclass';
   document.getElementById('af-goals-wrap').style.display = isHw ? '' : 'none';
+  document.getElementById('af-inclass-time-wrap').style.display = isIC ? '' : 'none';
 }
+
+// Auto-calculate session end time
+document.addEventListener('input', function(e){
+  if(e.target.id==='af-session-start'||e.target.id==='af-duration'){
+    var start = document.getElementById('af-session-start').value;
+    var dur   = parseInt(document.getElementById('af-duration').value,10)||45;
+    var endEl = document.getElementById('af-session-end');
+    if(start && endEl){
+      var d = new Date(start);
+      d.setMinutes(d.getMinutes()+dur);
+      endEl.value = d.toISOString().slice(0,16);
+    }
+  }
+});
 
 document.getElementById('assignModalClose').onclick = closeAssignModal;
 document.getElementById('assignCancel').onclick     = closeAssignModal;
@@ -763,6 +800,15 @@ document.getElementById('assignSave').onclick = function(){
     deadline: document.getElementById('af-deadline').value || '',
     requiredGoals: parseInt(document.getElementById('af-goals').value,10)||3,
   };
+  // In-class session timing
+  if(mode==='inclass'){
+    var sessStart = document.getElementById('af-session-start').value;
+    var sessDur   = parseInt(document.getElementById('af-duration').value,10)||45;
+    if(!sessStart){ VM.toast('Enter session start time for in-class assignment.','warn'); return; }
+    payload.sessionStart   = sessStart;
+    payload.sessionDurationMin = sessDur;
+    payload.sessionEnd     = document.getElementById('af-session-end').value || '';
+  }
 
   var action = state.editingAssignId ? 'assign.update' : 'assign.create';
   if (state.editingAssignId) payload.assignmentId = state.editingAssignId;
@@ -1065,6 +1111,183 @@ function _renderResultsUI() {
   if (toggleBtn) toggleBtn.onclick = function(){ renderResults(!state.resultsFull); };
 
   renderTable();
+}
+
+// ── HW Book ──────────────────────────────────────────────────────────
+function renderHWBook(){
+  loadClasses(function(){
+    loadAssignments(function(){
+      hideOverlay();
+      var c = document.getElementById('vmContent');
+
+      // Filter state
+      var filterCls  = '';
+      var filterMode = '';
+      var filterQ    = '';
+
+      // Default: only show assignments created in last 14 days
+      var showAll14 = false;
+      var CUTOFF_14 = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+
+      function filtered(){
+        return state.assignments.filter(function(a){
+          if(filterCls  && a.classId!==filterCls) return false;
+          if(filterMode && a.mode!==filterMode)   return false;
+          if(filterQ    && (a.title||'').toLowerCase().indexOf(filterQ.toLowerCase())<0) return false;
+          // 14-day filter (unless showAll14)
+          if(!showAll14){
+            var created = new Date(a.createdAt||0);
+            if(created < CUTOFF_14) return false;
+          }
+          return true;
+        }).sort(function(a,b){ return new Date(b.createdAt||0)-new Date(a.createdAt||0); });
+      }
+
+      function renderTable(){
+        var rows = filtered();
+        var tbody = document.getElementById('hwbTbody');
+        if(!tbody) return;
+        if(!rows.length){
+          tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:28px;color:var(--vm-ink-3)">No assignments found.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = rows.map(function(a){
+          var modeLabel = a.mode==='homework'?'📝 HW':'🖥️ IC';
+          var modeColor = a.mode==='homework'?'var(--vm-primary)':'#8B5CF6';
+          var wc = (a.vocab||[]).length;
+          var cls = state.classes.find(function(cl){return cl.classId===a.classId;});
+          var clsName = cls?cls.className:a.classId;
+          // Completion stats from results
+          var aResults = state.results.filter(function(r){return r.assignmentId===a.assignmentId;});
+          var submittedSet = {};
+          aResults.forEach(function(r){submittedSet[r.studentId]=true;});
+          var submitted = Object.keys(submittedSet).length;
+          return '<tr>'+
+            '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+
+              '<b style="font-size:.88rem">'+VM.esc(a.title)+'</b>'+
+            '</td>'+
+            '<td><span style="color:'+modeColor+';font-weight:600;font-size:.82rem">'+modeLabel+'</span></td>'+
+            '<td style="font-size:.82rem">'+VM.esc(clsName)+'</td>'+
+            '<td style="font-size:.82rem">'+wc+' words</td>'+
+            '<td style="font-size:.82rem">'+(a.deadline||'∞')+'</td>'+
+            (a.mode==='inclass'?
+              '<td style="font-size:.8rem;color:var(--vm-ink-2)">'+(a.sessionStart?a.sessionStart.replace('T',' '):'—')+'<br>'+
+                '<span style="color:var(--vm-ink-3)">'+(a.sessionDurationMin?a.sessionDurationMin+'min':'')+'</span></td>':
+              '<td style="font-size:.8rem;color:var(--vm-ink-3)">'+
+                (parseInt(a.requiredGoals,10)||3)+' perfect runs required</td>') +
+            '<td style="font-size:.8rem;color:var(--vm-ink-2)">'+submitted+' submitted</td>'+
+            '<td style="white-space:nowrap">'+
+              '<button class="vm-btn vm-btn-ghost vm-btn-sm" data-hwb-edit="'+VM.esc(a.assignmentId)+'" style="margin-right:4px">Edit</button>'+
+              '<button class="vm-btn vm-btn-ghost vm-btn-sm" data-hwb-toggle="'+VM.esc(a.assignmentId)+'" '+
+                'data-hwb-active="'+(a.active==='FALSE'?'false':'true')+'" '+
+                'style="color:'+(a.active==='FALSE'?'var(--vm-ok)':'var(--vm-danger)')+'">'+
+                (a.active==='FALSE'?'Re-open':'Close')+
+              '</button>'+
+              '<button class="vm-btn vm-btn-ghost vm-btn-sm" data-hwb-del="'+VM.esc(a.assignmentId)+'" style="color:var(--vm-danger);margin-left:4px">✕</button>'+
+            '</td>'+
+          '</tr>';
+        }).join('');
+
+        // Edit
+        VM.els('[data-hwb-edit]').forEach(function(btn){
+          btn.onclick=function(){
+            var a=state.assignments.find(function(x){return x.assignmentId===btn.getAttribute('data-hwb-edit');});
+            if(a){ state.activeTab='hwbook'; openAssignModal(a); }
+          };
+        });
+        // Toggle active
+        VM.els('[data-hwb-toggle]').forEach(function(btn){
+          btn.onclick=function(){
+            var aid=btn.getAttribute('data-hwb-toggle');
+            var isActive=btn.getAttribute('data-hwb-active')==='true';
+            var newActive=!isActive;
+            showOverlay((newActive?'Re-opening':'Closing')+' assignment…');
+            VM.api('assign.update',{assignmentId:aid,active:newActive}).then(function(res){
+              hideOverlay();
+              if(res&&res.success){
+                VM.toast('Assignment '+(newActive?'re-opened':'closed')+'.','ok');
+                loadAssignments(renderTable);
+              } else VM.toast('Error: '+(res&&res.error),'err');
+            }).catch(function(){hideOverlay();VM.toast('Connection error.','err');});
+          };
+        });
+        // Delete
+        VM.els('[data-hwb-del]').forEach(function(btn){
+          btn.onclick=function(){
+            if(!confirm('Delete this assignment? This cannot be undone.')) return;
+            showOverlay('Deleting…');
+            VM.api('assign.delete',{assignmentId:btn.getAttribute('data-hwb-del')}).then(function(res){
+              hideOverlay();
+              if(res&&res.success){ VM.toast('Deleted.','ok'); loadAssignments(renderTable); }
+              else VM.toast('Error.','err');
+            }).catch(function(){hideOverlay();VM.toast('Connection error.','err');});
+          };
+        });
+      }
+
+      // Summary KPIs
+      var hwCount = state.assignments.filter(function(a){return a.mode==='homework';}).length;
+      var icCount = state.assignments.filter(function(a){return a.mode==='inclass';}).length;
+      var closedCount = state.assignments.filter(function(a){return a.active==='FALSE';}).length;
+
+      c.innerHTML =
+        // KPI row
+        '<div class="vm-kpi-row" style="margin-bottom:16px">'+
+          kpi(hwCount,'Homework','assignments')+
+          kpi(icCount,'In-class','assignments')+
+          kpi(closedCount,'Closed','archived')+
+        '</div>'+
+        // Toolbar
+        '<div class="vm-toolbar" style="margin-bottom:14px">'+
+          '<div class="vm-search">'+VM.icon('search')+'<input id="hwbSearch" placeholder="Search assignments…"></div>'+
+          '<select class="vm-select" id="hwbClass"><option value="">All classes</option>'+
+            state.classes.map(function(cl){return '<option value="'+VM.esc(cl.classId)+'">'+VM.esc(cl.className)+'</option>';}).join('')+
+          '</select>'+
+          '<select class="vm-select" id="hwbMode"><option value="">All modes</option>'+
+            '<option value="homework">📝 Homework</option><option value="inclass">🖥️ In-class</option>'+
+          '</select>'+
+          '<button class="vm-btn vm-btn-primary vm-btn-sm" id="hwbNewHW">+ New HW</button>'+
+          '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="hwbNewIC">+ New IC</button>'+
+          '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="hwb14Toggle" style="color:var(--vm-ink-3)">📅 Last 14 days</button>'+
+        '</div>'+
+        // Table
+        '<div class="vm-table-wrap" style="overflow-x:auto">'+
+          '<table class="vm-table"><thead><tr>'+
+            '<th>Title</th><th>Mode</th><th>Class</th><th>Words</th>'+
+            '<th>Deadline</th><th>HW Goal / IC Session</th><th>Submissions</th><th>Actions</th>'+
+          '</tr></thead>'+
+          '<tbody id="hwbTbody"></tbody>'+
+        '</table></div>';
+
+      // Wire new buttons
+      setTimeout(function(){
+        var nb=document.getElementById('hwbNewHW'); if(nb) nb.onclick=function(){openAssignModal(null,'homework');};
+        var ni=document.getElementById('hwbNewIC'); if(ni) ni.onclick=function(){openAssignModal(null,'inclass');};
+        var t14=document.getElementById('hwb14Toggle');
+        if(t14) t14.onclick=function(){
+          showAll14=!showAll14;
+          t14.textContent=showAll14?'📅 All time':'📅 Last 14 days';
+          t14.style.color=showAll14?'var(--vm-primary)':'var(--vm-ink-3)';
+          renderTable();
+        };
+      },0);
+
+      // Wire filters
+      ['hwbSearch','hwbClass','hwbMode'].forEach(function(id){
+        var el=document.getElementById(id);
+        if(!el) return;
+        el.addEventListener(id==='hwbSearch'?'input':'change',function(){
+          filterQ   = (document.getElementById('hwbSearch').value||'').trim();
+          filterCls = document.getElementById('hwbClass').value||'';
+          filterMode= document.getElementById('hwbMode').value||'';
+          renderTable();
+        });
+      });
+
+      // Initial load results for submission counts
+      loadResults(false, renderTable);
+    });
+  });
 }
 
 // ── Boot ────────────────────────────────────────────────────────────

@@ -577,10 +577,12 @@ function showResult(){
     '</div>';
   document.getElementById('tryAgain').onclick=function(){
     if(asgn.mode==='readwise' && _currentRWArticle) openRWQuiz(_currentRWArticle);
+    else if(asgn.mode==='readwise') renderReadWise();  // vocab quiz retry → back to RW
     else startQuiz(asgn);
   };
   document.getElementById('backRes').onclick=function(){
     if(asgn.mode==='readwise' && _currentRWArticle) renderRWReader(_currentRWArticle);
+    else if(asgn.mode==='readwise') renderReadWise();
     else switchTab(S.activeTab);
   };
 }
@@ -679,13 +681,65 @@ function renderReadWise(){
       '<div>'+
         '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'+
           '<div style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--vm-ink-2)">📚 BÀI ĐÃ LƯU</div>'+
-          '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="rwRefreshBtn">↺ Tải lại</button>'+
+          '<div style="display:flex;gap:8px">'+
+            '<button class="vm-btn vm-btn-primary vm-btn-sm" id="rwCreateQuizBtn">✏️ Create Vocab Quiz</button>'+
+            '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="rwRefreshBtn">↺ Tải lại</button>'+
+          '</div>'+
         '</div>'+
         '<div id="rwSavedList">'+renderSavedList(_rwArticles)+
+        '</div>'+
+      '</div>'+
+      // Vocab Quiz creator panel (hidden by default)
+      '<div id="rwVocabQuizPanel" style="display:none;margin-top:16px;background:var(--vm-surface);border:1px solid var(--vm-border-2);border-radius:var(--vm-r);padding:22px 24px">'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'+
+          '<h3 style="font-family:var(--vm-font-display);font-size:1rem;font-weight:700;margin:0;color:var(--vm-ink)">✏️ Vocab Quiz Creator</h3>'+
+          '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="rwCloseQuizPanel">✕ Close</button>'+
+        '</div>'+
+        '<p style="font-size:.82rem;color:var(--vm-ink-2);margin:0 0 12px">Enter up to 65 words you want to practice. AI will generate synonyms &amp; Vietnamese meanings, then build a 65-question spaced repetition quiz.</p>'+
+        '<div class="vm-field">'+
+          '<label class="vm-label">Words (one per line, or word = definition)</label>'+
+          '<textarea class="vm-input" id="rwVocabInput" rows="8" placeholder="photosynthesis&#10;catalyst = a substance that speeds up a reaction&#10;mitosis&#10;osmosis" style="resize:vertical;font-family:monospace;font-size:.88rem;line-height:1.6"></textarea>'+
+          '<div style="display:flex;justify-content:space-between;margin-top:4px">'+
+            '<span id="rwVocabCount" style="font-size:.74rem;color:var(--vm-ink-3)">0/65 words</span>'+
+            '<span style="font-size:.74rem;color:var(--vm-ink-3)">Gemini key required for AI enrichment</span>'+
+          '</div>'+
+        '</div>'+
+        '<div id="rwVocabAIStatus" style="font-size:.82rem;color:var(--vm-ink-3);margin-bottom:12px;min-height:18px"></div>'+
+        '<div style="display:flex;gap:10px;flex-wrap:wrap">'+
+          '<button class="vm-btn vm-btn-primary" id="rwLaunchQuizBtn" style="padding:11px 22px">🚀 Enrich &amp; Start Quiz</button>'+
+          '<button class="vm-btn vm-btn-ghost" id="rwQuickLaunchBtn" style="padding:11px 18px">⚡ Quick Start (no AI)</button>'+
         '</div>'+
       '</div>';
 
     document.getElementById('rwRefreshBtn').onclick=function(){ renderReadWise(); };
+
+    // Create Vocab Quiz toggle
+    document.getElementById('rwCreateQuizBtn').onclick=function(){
+      var panel=document.getElementById('rwVocabQuizPanel');
+      if(panel){ panel.style.display='block'; panel.scrollIntoView({behavior:'smooth',block:'nearest'}); }
+    };
+    document.getElementById('rwCloseQuizPanel').onclick=function(){
+      var panel=document.getElementById('rwVocabQuizPanel');
+      if(panel) panel.style.display='none';
+    };
+
+    // Word count
+    var vocabInput=document.getElementById('rwVocabInput');
+    if(vocabInput) vocabInput.oninput=function(){
+      var words=vocabInput.value.split('\n').map(function(l){return l.trim();}).filter(Boolean);
+      var wcount=Math.min(words.length,65);
+      var countEl=document.getElementById('rwVocabCount');
+      if(countEl){ countEl.textContent=wcount+'/65 words'; countEl.style.color=wcount>=65?'var(--vm-ok)':'var(--vm-ink-3)'; }
+    };
+
+    // Launch with AI enrichment
+    document.getElementById('rwLaunchQuizBtn').onclick=function(){
+      launchVocabQuiz(true);
+    };
+    // Quick launch — no AI, use synonyms from "=" parsing only
+    document.getElementById('rwQuickLaunchBtn').onclick=function(){
+      launchVocabQuiz(false);
+    };
     document.getElementById('rwAnalyseBtn').onclick=analyseAndSaveArticle;
     bindSavedList();
   }).catch(function(){
@@ -1031,6 +1085,80 @@ function renderRWReader(art){
   render();
 }
 
+function launchVocabQuiz(withAI){
+  var input = document.getElementById('rwVocabInput');
+  if(!input||!input.value.trim()){ VM.toast('Enter at least 1 word.','warn'); return; }
+  var raw = input.value;
+
+  // Parse words client-side first
+  var lines = raw.split('\n').map(function(l){return l.trim();}).filter(Boolean).slice(0,65);
+  var parsed = lines.map(function(l){
+    var eq=l.indexOf('='), col=l.indexOf(':'), si=-1;
+    if(eq>=0&&(col<0||eq<=col)) si=eq;
+    else if(col>=0&&col<40) si=col;
+    var word=si>=0?l.slice(0,si).trim():l.trim();
+    var syn =si>=0?l.slice(si+1).trim():'';
+    word=word.replace(/^\d+[\.)\s]+/,'').replace(/^[-•*]\s*/,'').replace(/\s*[\(\[].+[\)\]]\s*$/,'').trim();
+    var syns=syn?syn.split(',').map(function(s){return s.trim();}).filter(Boolean):[];
+    return {word:word,ipa:'',synonyms:syns,vi:'',meaningVi:''};
+  }).filter(function(p){return p.word;});
+
+  if(!parsed.length){ VM.toast('No valid words found.','warn'); return; }
+
+  function startWithVocab(vocab){
+    // Build a synthetic "assignment" object for the quiz engine
+    var fakeAsgn = {
+      assignmentId: 'vq_'+Date.now(),
+      title: 'Vocab Quiz ('+vocab.length+' words)',
+      mode: 'readwise',
+      vocab: vocab,
+      requiredGoals: 0,
+      classId: sess.class||''
+    };
+    S.quiz = VM.buildQuiz(vocab, {isReview:false, total:65});
+    S.quizState = {
+      asgn: fakeAsgn, qIdx:0, correct:0, startTs:Date.now(), wrongAnswers:{}
+    };
+    _currentRWArticle = null; // no article to return to — go back to readwise tab
+    var c=document.getElementById('vmContent');
+    VM.setTitle('Vocab Quiz');
+    c.innerHTML=
+      '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="vqBack" style="margin-bottom:12px">← Back to ReadWise</button>'+
+      '<div id="quizArea"></div>';
+    document.getElementById('vqBack').onclick=function(){ renderReadWise(); };
+    renderQ();
+  }
+
+  if(!withAI){
+    // Use parsed synonyms directly, no AI
+    startWithVocab(parsed);
+    return;
+  }
+
+  // Enrich with AI
+  var key = VM.geminiKey.get() || VM.groqKey.get();
+  if(!key){ VM.toast('No API key saved. Go to Settings or use Quick Start.','warn'); return; }
+
+  var statusEl = document.getElementById('rwVocabAIStatus');
+  var launchBtn = document.getElementById('rwLaunchQuizBtn');
+  if(launchBtn) launchBtn.disabled=true;
+  if(statusEl) statusEl.innerHTML='<span class="vm-spin-dark" style="width:13px;height:13px;border-width:2px;display:inline-block;vertical-align:middle;margin-right:6px"></span> AI đang tạo synonym & Vietnamese meanings…';
+
+  var rawList = lines.join('\n');
+  VM.analyzeVocab(rawList, VM.geminiKey.get()||'GROQ_FALLBACK', function(done,total){
+    if(statusEl) statusEl.textContent='Enriching '+done+'/'+total+' words…';
+  }).then(function(enriched){
+    if(launchBtn) launchBtn.disabled=false;
+    if(statusEl) statusEl.textContent='';
+    startWithVocab(enriched);
+  }).catch(function(err){
+    if(launchBtn) launchBtn.disabled=false;
+    if(statusEl){ statusEl.style.color='var(--vm-danger)'; statusEl.textContent='AI failed: '+err.message+'. Using parsed data.'; }
+    // Fallback: use parsed data without AI enrichment
+    setTimeout(function(){ startWithVocab(parsed); }, 1500);
+  });
+}
+
 function openRWQuiz(art){
   var vocab = art.vocab || [];
   if(!vocab.length){ VM.toast('No vocabulary to quiz.','warn'); return; }
@@ -1112,6 +1240,14 @@ function renderHistory(){
         var runs = g.runs.slice().sort(function(a,b){return new Date(a.timestamp)-new Date(b.timestamp);});
         var attempts = runs.length;
         var perfects = runs.filter(function(r){return r.isPerfect;}).length;
+        // For readwise: also count total missed words across all runs
+        var totalMissedCount = 0;
+        if(g.mode==='readwise'){
+          runs.forEach(function(r){
+            var mw=[];try{mw=JSON.parse(r.missedWords||'[]');}catch(e){}
+            totalMissedCount+=mw.length;
+          });
+        }
         var bestScore = Math.max.apply(null, runs.map(function(r){return parseFloat(r.score)||0;}));
         var lastScore = parseFloat(runs[runs.length-1].score)||0;
         var lastTs    = runs[runs.length-1].timestamp;
@@ -1159,8 +1295,13 @@ function renderHistory(){
               '</div>'+
               '<div style="text-align:center">'+
                 '<div style="font-family:var(--vm-font-display);font-size:1.3rem;font-weight:700;color:var(--vm-ink)">'+attempts+'</div>'+
-                '<div style="font-size:.66rem;color:var(--vm-ink-3);font-weight:600;text-transform:uppercase;letter-spacing:.04em">Runs</div>'+
+                '<div style="font-size:.66rem;color:var(--vm-ink-3);font-weight:600;text-transform:uppercase;letter-spacing:.04em">Quiz runs</div>'+
               '</div>'+
+              (g.mode==='readwise'?
+                '<div style="text-align:center">'+
+                  '<div style="font-family:var(--vm-font-display);font-size:1.3rem;font-weight:700;color:var(--vm-danger)">'+totalMissedCount+'</div>'+
+                  '<div style="font-size:.66rem;color:var(--vm-ink-3);font-weight:600;text-transform:uppercase;letter-spacing:.04em">Total missed</div>'+
+                '</div>':'') +
               '<div style="text-align:center">'+
                 '<div style="font-family:var(--vm-font-display);font-size:1.3rem;font-weight:700;color:var(--vm-ok)">'+bestScore+'%</div>'+
                 '<div style="font-size:.66rem;color:var(--vm-ink-3);font-weight:600;text-transform:uppercase;letter-spacing:.04em">Best</div>'+
