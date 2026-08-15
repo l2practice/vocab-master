@@ -452,7 +452,7 @@
     if(onProgress) onProgress(0,parsed.length);
 
     // Phase 2: AI enrichment — IPA + vi only, 30/batch
-    var BATCH=30, MODELS=['gemini-3.5-flash','gemini-3.1-flash-lite','gemini-3.6-flash'];
+    var BATCH=30, MODELS=['gemini-2.0-flash','gemini-1.5-flash','gemini-1.5-flash-8b'];
     var words=parsed.map(function(p){return p.word;});
     var batches=[];
     for(var b=0;b<words.length;b+=BATCH) batches.push({words:words.slice(b,b+BATCH),offset:b});
@@ -552,15 +552,15 @@ VM.Chat = (function(){
   var _mounted = false;
 
   var STUDENT_MODELS = [
-    {id:'gemini-3.5-flash',      label:'Gemini 3.5 Flash',      type:'gemini'},
-    {id:'gemini-3.1-flash-lite', label:'Gemini 3.1 Flash Lite', type:'gemini'},
-    {id:'gemini-3.6-flash',      label:'Gemini 3.6 Flash',      type:'gemini'},
+    {id:'gemini-2.0-flash',      label:'Gemini 2.0 Flash',      type:'gemini'},
+    {id:'gemini-1.5-flash', label:'Gemini 1.5 Flash', type:'gemini'},
+    {id:'gemini-1.5-flash-8b',      label:'Gemini 1.5 Flash 8B',      type:'gemini'},
     {id:'groq-llama',            label:'Groq Llama 3 70B',        type:'groq'},
   ];
   var TEACHER_MODELS = [
-    {id:'gemini-3.5-flash',      label:'Gemini 3.5 Flash',      type:'gemini'},
-    {id:'gemini-3.1-flash-lite', label:'Gemini 3.1 Flash Lite', type:'gemini'},
-    {id:'gemini-3.6-flash',      label:'Gemini 3.6 Flash',      type:'gemini'},
+    {id:'gemini-2.0-flash',      label:'Gemini 2.0 Flash',      type:'gemini'},
+    {id:'gemini-1.5-flash', label:'Gemini 1.5 Flash', type:'gemini'},
+    {id:'gemini-1.5-flash-8b',      label:'Gemini 1.5 Flash 8B',      type:'gemini'},
     {id:'groq-llama',            label:'Groq Llama 3 70B',        type:'groq'},
     {id:'gpt-4o-mini',           label:'GPT-4o Mini',           type:'openai'},
     {id:'claude-3-5-haiku',      label:'Claude 3.5 Haiku',      type:'anthropic'},
@@ -595,7 +595,7 @@ VM.Chat = (function(){
     localStorage.setItem('vm_chat_key_' + modelId, key);
   }
   function _getSavedModel(){
-    return localStorage.getItem('vm_chat_model') || (_role==='teacher'?'gemini-3.5-flash':'auto');
+    return localStorage.getItem('vm_chat_model') || (_role==='teacher'?'gemini-2.0-flash':'auto');
   }
   function _setSavedModel(m){ localStorage.setItem('vm_chat_model', m); }
 
@@ -677,7 +677,7 @@ VM.Chat = (function(){
   // Student auto-cascade: try Gemini models → Groq
   async function _sendStudent(userMsg){
     var msgs = _history.concat([{role:'user',content:userMsg}]);
-    var cascade = ['gemini-3.5-flash','gemini-3.1-flash-lite','gemini-3.6-flash','groq-llama'];
+    var cascade = ['gemini-2.0-flash','gemini-1.5-flash','gemini-1.5-flash-8b','groq-llama'];
     for(var i=0; i<cascade.length; i++){
       try {
         return await _callAI(msgs, cascade[i]);

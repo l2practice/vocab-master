@@ -804,46 +804,65 @@ function analyseAndSaveArticle(){
     '[{"phrase":"...","meaning":"Vietnamese meaning"}]\n\n'+
     'Passage:\n'+passage.slice(0,2000);
 
-  var MODELS=['gemini-3.5-flash','gemini-3.1-flash-lite','gemini-3.6-flash'];
+  // Working Gemini models (verified Aug 2026)
+  var MODELS=['gemini-2.0-flash','gemini-1.5-flash','gemini-1.5-flash-8b'];
 
-  function callGemini(prompt, parseArr){
+  function parseJsonArray(text){
+    text = text.replace(/```json[\n]?/g,'').replace(/```[\n]?/g,'').trim();
+    // Auto-close truncated JSON
+    var opens=(text.match(/\{/g)||[]).length, closes=(text.match(/\}/g)||[]).length;
+    if(opens>closes) text=text.replace(/,?\s*$/,'')+'}]';
+    if(!text.startsWith('[')) text='['+text;
+    if(!text.endsWith(']')) text+=']';
+    return JSON.parse(text);
+  }
+
+  function callGemini(prompt){
     var mi=0;
     function tryM(){
-      if(mi>=MODELS.length) return Promise.reject(new Error('All models failed'));
+      if(mi>=MODELS.length) return Promise.reject(new Error('All Gemini models failed'));
       var m=MODELS[mi++];
       return fetch('https://generativelanguage.googleapis.com/v1beta/models/'+m+':generateContent?key='+encodeURIComponent(key),{
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:4096,temperature:0.1}})
       }).then(function(r){
         if(r.status===429) return new Promise(function(rs){setTimeout(rs,3000);}).then(tryM);
-        if(!r.ok) return r.json().catch(function(){return{};}).then(function(e){throw new Error((e.error&&e.error.message)||'HTTP '+r.status);});
+        if(!r.ok) return r.json().catch(function(){return{};}).then(function(e){
+          throw new Error((e.error&&e.error.message)||'Gemini '+r.status);
+        });
         return r.json();
       }).then(function(d){
         var parts=(((d.candidates||[])[0]||{}).content||{}).parts||[];
         var text=parts.map(function(p){return p.text||'';}).join('').trim();
-        if(!text) throw new Error('Empty response');
-        text=text.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
-        var opens=(text.match(/\{/g)||[]).length,closes=(text.match(/\}/g)||[]).length;
-        if(opens>closes) text=text.replace(/,?\s*$/,'')+'}]';
-        if(!text.endsWith(']')) text+=']';
-        return JSON.parse(text);
-      }).catch(function(err){if(mi<MODELS.length)return tryM();throw err;});
-    }
-    // Groq fallback after all Gemini models fail
-    function tryGroqRW(p){
-      var gk=localStorage.getItem('vm_groq_key')||'';
-      if(!gk) return Promise.reject(new Error('NO_GROQ_KEY'));
-      return fetch('https://api.groq.com/openai/v1/chat/completions',{
-        method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+gk},
-        body:JSON.stringify({model:'llama3-70b-8192',messages:[{role:'user',content:p}],temperature:0.1,max_tokens:4096})
-      }).then(function(r){return r.json();}).then(function(d){
-        var text=((d.choices||[])[0]||{}).message&&d.choices[0].message.content||'';
-        text=text.replace(/```json[\n]?/g,'').replace(/```[\n]?/g,'').trim();
-        if(!text.endsWith(']')) text+=']';
-        return JSON.parse(text);
+        if(!text) throw new Error('Empty response from '+m);
+        return parseJsonArray(text);
+      }).catch(function(err){
+        if(mi<MODELS.length) return tryM();
+        throw err;
       });
     }
-    return tryM().catch(function(){ return tryGroqRW(prompt); });
+
+    // Groq fallback
+    function tryGroqRW(){
+      var gk=localStorage.getItem('vm_groq_key')||'';
+      if(!gk) return Promise.reject(new Error('No Groq key — add one in Settings'));
+      return fetch('https://api.groq.com/openai/v1/chat/completions',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+gk},
+        body:JSON.stringify({model:'llama3-70b-8192',messages:[{role:'user',content:prompt}],temperature:0.1,max_tokens:4096})
+      }).then(function(r){
+        if(!r.ok) return r.json().catch(function(){return{};}).then(function(e){
+          throw new Error((e.error&&e.error.message)||'Groq '+r.status);
+        });
+        return r.json();
+      }).then(function(d){
+        var text=((d.choices||[])[0]||{}).message&&d.choices[0].message.content||'';
+        if(!text) throw new Error('Empty Groq response');
+        return parseJsonArray(text);
+      });
+    }
+
+    return tryM().catch(function(){ return tryGroqRW(); });
   }
 
   var vocabResult=[], collocResult=[];
