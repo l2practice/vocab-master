@@ -835,7 +835,7 @@ function analyseAndSaveArticle(){
       if(!gk) return Promise.reject(new Error('NO_GROQ_KEY'));
       return fetch('https://api.groq.com/openai/v1/chat/completions',{
         method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+gk},
-        body:JSON.stringify({model:'llama-3.1-8b-instant',messages:[{role:'user',content:p}],temperature:0.1,max_tokens:4096})
+        body:JSON.stringify({model:'llama3-70b-8192',messages:[{role:'user',content:p}],temperature:0.1,max_tokens:4096})
       }).then(function(r){return r.json();}).then(function(d){
         var text=((d.choices||[])[0]||{}).message&&d.choices[0].message.content||'';
         text=text.replace(/```json[\n]?/g,'').replace(/```[\n]?/g,'').trim();
@@ -894,7 +894,7 @@ function analyseAndSaveArticle(){
       banner.style.cssText='background:#FEF3D6;border:1.5px solid #F59E0B;border-radius:10px;padding:14px 16px;margin-top:10px';
       banner.innerHTML=
         '<div style="font-weight:700;font-size:.88rem;color:#7A5000;margin-bottom:6px">⚠️ Tất cả Gemini model đều thất bại</div>'+
-        '<p style="font-size:.8rem;color:#7A5000;margin:0 0 10px">Dùng Groq (llama-3.1) miễn phí để thay thế. '+
+        '<p style="font-size:.8rem;color:#7A5000;margin:0 0 10px">Dùng Groq (llama3-70b) miễn phí để thay thế. '+
           '<a href="https://console.groq.com/keys" target="_blank" style="color:var(--vm-primary);font-weight:600">Lấy Groq key →</a></p>'+
         '<div style="display:flex;gap:8px">'+
           '<input id="rwGroqIn" type="password" placeholder="gsk_…" '+

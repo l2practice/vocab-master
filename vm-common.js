@@ -453,7 +453,7 @@
         if(!groqKey) return Promise.reject(new Error('NO_GROQ_KEY'));
         return fetch('https://api.groq.com/openai/v1/chat/completions',{
           method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+groqKey},
-          body:JSON.stringify({model:'llama-3.1-8b-instant',messages:[{role:'user',content:prompt}],temperature:0.1,max_tokens:4096})
+          body:JSON.stringify({model:'llama3-70b-8192',messages:[{role:'user',content:prompt}],temperature:0.1,max_tokens:4096})
         }).then(function(r){
           if(!r.ok) return r.json().catch(function(){return{};}).then(function(e){throw new Error((e.error&&e.error.message)||'Groq HTTP '+r.status);});
           return r.json();
@@ -519,13 +519,13 @@ VM.Chat = (function(){
     {id:'gemini-3.5-flash',      label:'Gemini 3.5 Flash',      type:'gemini'},
     {id:'gemini-3.1-flash-lite', label:'Gemini 3.1 Flash Lite', type:'gemini'},
     {id:'gemini-3.6-flash',      label:'Gemini 3.6 Flash',      type:'gemini'},
-    {id:'groq-llama',            label:'Groq Llama 3.1',        type:'groq'},
+    {id:'groq-llama',            label:'Groq Llama 3 70B',        type:'groq'},
   ];
   var TEACHER_MODELS = [
     {id:'gemini-3.5-flash',      label:'Gemini 3.5 Flash',      type:'gemini'},
     {id:'gemini-3.1-flash-lite', label:'Gemini 3.1 Flash Lite', type:'gemini'},
     {id:'gemini-3.6-flash',      label:'Gemini 3.6 Flash',      type:'gemini'},
-    {id:'groq-llama',            label:'Groq Llama 3.1',        type:'groq'},
+    {id:'groq-llama',            label:'Groq Llama 3 70B',        type:'groq'},
     {id:'gpt-4o-mini',           label:'GPT-4o Mini',           type:'openai'},
     {id:'claude-3-5-haiku',      label:'Claude 3.5 Haiku',      type:'anthropic'},
     {id:'grok-2',                label:'Grok 2',                type:'xai'},
@@ -590,7 +590,7 @@ VM.Chat = (function(){
       var gk = VM.groqKey.get();
       if(!gk) throw new Error('NO_GROQ_KEY');
       var payload = {
-        model:'llama-3.1-8b-instant',
+        model:'llama3-70b-8192',
         messages:[{role:'system',content:_systemPrompt()}].concat(messages),
         temperature:0.7, max_tokens:1024
       };
