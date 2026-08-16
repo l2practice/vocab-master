@@ -269,7 +269,8 @@ function switchTab(id) {
   VM.setTitle(titles[id] || id);
   var content = document.getElementById('vmContent');
   content.innerHTML = '<div class="vm-empty"><span class="vm-spin-dark" style="width:24px;height:24px;border-width:3px"></span></div>';
-  showOverlay('Loading…');
+  // Results tab manages its own loading state — don't show global overlay
+  if (id !== 'results') showOverlay('Loading…');
   if (id === 'overview') renderOverview();
   else if (id === 'classes')  renderClasses();
   else if (id === 'assign')   renderAssignments();
@@ -921,11 +922,19 @@ function renderResults() {
       }).join('');
   }
 
+  // Hide the tab-switch overlay immediately — results load on demand
+  hideOverlay();
+
   document.getElementById('rsCls').onchange = function(){
     RS.page = 1;
     refreshAssignDropdown();
   };
-  loadAssignments(refreshAssignDropdown);
+  // Use cached assignments if already loaded, else fetch silently (no overlay)
+  if(state.assignments.length) {
+    refreshAssignDropdown();
+  } else {
+    loadAssignments(refreshAssignDropdown);
+  }
 
   /* ── Load data ───────────────────────────────── */
   function load(page){
