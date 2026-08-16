@@ -221,6 +221,26 @@ function showOverlay(msg){
 }
 function hideOverlay(){ document.getElementById('globalOverlay').classList.remove('show'); }
 
+  // Format deadline: "2026-08-17" → "17/08/2026" | ISO datetime → local +7
+  function fmtDeadline(val) {
+    if (!val || val === '∞' || val === '') return '∞';
+    var s = String(val).trim();
+    // Date only (YYYY-MM-DD) — show as DD/MM/YYYY, no timezone conversion needed
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+      var parts = s.split('-');
+      return parts[2] + '/' + parts[1] + '/' + parts[0];
+    }
+    // ISO datetime — convert to UTC+7
+    var d = new Date(s);
+    if (isNaN(d.getTime())) return s;
+    var vn = new Date(d.getTime() + 7 * 3600000);
+    return vn.getUTCDate().toString().padStart(2,'0') + '/' +
+           (vn.getUTCMonth()+1).toString().padStart(2,'0') + '/' +
+           vn.getUTCFullYear() + ' ' +
+           vn.getUTCHours().toString().padStart(2,'0') + ':' +
+           vn.getUTCMinutes().toString().padStart(2,'0');
+  }
+
   // Resolve classId → className (falls back to classId if not loaded yet)
   function clsName(id) {
     if (!id) return '—';
@@ -541,7 +561,7 @@ function renderAssignList() {
         '<td><b>'+VM.esc(a.title)+'</b></td>' +
         '<td>'+VM.esc(clsName(a.classId))+'</td>' +
         '<td>'+modeLabel+'</td>' +
-        '<td>'+(a.deadline?VM.esc(a.deadline):'∞')+'</td>' +
+        '<td>'+fmtDeadline(a.deadline)+'</td>' +
         '<td>'+(a.mode==='homework'?a.requiredGoals:'—')+'</td>' +
         '<td>'+(a.vocab?a.vocab.length:0)+'</td>' +
         '<td>' +
@@ -846,15 +866,22 @@ document.getElementById('assignSave').onclick = function(){
   if (state.editingAssignId) payload.assignmentId = state.editingAssignId;
 
   document.getElementById('assignSave').disabled = true;
-  showOverlay('Saving assignment… (vocab sent in chunks)');
+  showOverlay('Saving assignment…');
   VM.apiLarge(action, payload).then(function(res){
+    hideOverlay();
     document.getElementById('assignSave').disabled = false;
     if(res&&res.success){
       VM.toast(state.editingAssignId?'Assignment updated.':'Assignment saved!','ok');
       closeAssignModal();
       loadAssignments(function(){ if(state.activeTab==='assign') renderAssignList(); });
-    } else VM.toast('Error: '+(res&&res.error),'err',5000);
-  }).catch(function(){ document.getElementById('assignSave').disabled=false; VM.toast('Connection error.','err'); });
+    } else {
+      VM.toast('Error: '+(res&&res.error||'Unknown'),'err',5000);
+    }
+  }).catch(function(err){
+    hideOverlay();
+    document.getElementById('assignSave').disabled = false;
+    VM.toast('Connection error: '+(err&&err.message||err),'err',5000);
+  });
 };
 
 // ── Results tab ────────────────────────────────────────────────────
@@ -1224,10 +1251,10 @@ function renderHWBook(){
             '<td><span style="color:'+modeColor+';font-weight:600;font-size:.82rem">'+modeLabel+'</span></td>'+
             '<td style="font-size:.82rem">'+VM.esc(clsDisplayed)+'</td>'+
             '<td style="font-size:.82rem">'+wc+' words</td>'+
-            '<td style="font-size:.82rem">'+(a.deadline||'∞')+'</td>'+
+            '<td style="font-size:.82rem">'+fmtDeadline(a.deadline)+'</td>'+
             (a.mode==='inclass'?
-              '<td style="font-size:.8rem;color:var(--vm-ink-2)">'+(a.sessionStart?a.sessionStart.replace('T',' '):'—')+'<br>'+
-                '<span style="color:var(--vm-ink-3)">'+(a.sessionDurationMin?a.sessionDurationMin+'min':'')+'</span></td>':
+              '<td style="font-size:.8rem;color:var(--vm-ink-2)">'+fmtDeadline(a.sessionStart||'')+'<br>'+
+                '<span style="color:var(--vm-ink-3)">'+(a.sessionDurationMin?a.sessionDurationMin+' min':'')+'</span></td>':
               '<td style="font-size:.8rem;color:var(--vm-ink-3)">'+
                 (parseInt(a.requiredGoals,10)||3)+' perfect runs required</td>') +
             '<td style="font-size:.8rem;color:var(--vm-ink-2)">'+submitted+' submitted</td>'+

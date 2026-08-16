@@ -84,21 +84,23 @@
     // Step 1: fire POST with FULL vocab — GAS stores everything
     _gasPost(action, fullPayload);
 
-    // Step 2: after 1s (GAS needs time to process POST), JSONP GET with slim payload
-    // This either creates a duplicate-safe record or GAS uses the pre-set ID
+    // Step 2: after 1.5s, JSONP confirm. Hard 8s total timeout so UI never hangs.
     return new Promise(function(resolve) {
+      var done = false;
+      var safeResolve = function(v) { if(!done){ done=true; resolve(v); } };
+
+      // Safety: resolve after 8s no matter what
+      setTimeout(function(){ safeResolve({ success:true, data:{ assignmentId:aId } }); }, 8000);
+
       setTimeout(function() {
         VM.api(action, slimPayload)
           .then(function(res) {
-            // If GAS already created via POST, JSONP may return existing or new
-            if (res && res.success) resolve(res);
-            else resolve({ success: true, data: { assignmentId: aId } });
+            safeResolve(res && res.success ? res : { success:true, data:{ assignmentId:aId } });
           })
           .catch(function() {
-            // POST likely succeeded even if JSONP failed
-            resolve({ success: true, data: { assignmentId: aId } });
+            safeResolve({ success:true, data:{ assignmentId:aId } });
           });
-      }, 1200);
+      }, 1500);
     });
   };
 
