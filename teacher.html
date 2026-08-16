@@ -691,7 +691,7 @@ document.getElementById('af-verify-key').onclick = function(){
   if (!raw || raw === '••••• (key saved)') { VM.toast('Enter API key.','warn'); return; }
   VM.geminiKey.set(raw);
   document.getElementById('af-key-status').textContent = '⏳ Verifying…';
-  fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key='+encodeURIComponent(raw),{
+  fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key='+encodeURIComponent(raw),{
     method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({contents:[{parts:[{text:'Say "ok" only'}]}],generationConfig:{maxOutputTokens:5}})
   }).then(function(r){return r.json();}).then(function(){

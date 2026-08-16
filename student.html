@@ -805,7 +805,7 @@ function analyseAndSaveArticle(){
     'Passage:\n'+passage.slice(0,2000);
 
   // Working Gemini models (verified Aug 2026)
-  var MODELS=['gemini-2.0-flash','gemini-1.5-flash','gemini-1.5-flash-8b'];
+  var MODELS=['gemini-3.5-flash','gemini-3.6-flash','gemini-3.5-flash-lite'];
 
   function parseJsonArray(text){
     text = text.replace(/```json[\n]?/g,'').replace(/```[\n]?/g,'').trim();
