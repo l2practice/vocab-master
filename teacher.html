@@ -274,7 +274,7 @@ function switchTab(id) {
   else if (id === 'classes')  renderClasses();
   else if (id === 'assign')   renderAssignments();
   else if (id === 'hwbook')   renderHWBook();
-  else if (id === 'results')  renderResults(false);
+  else if (id === 'results')  renderResults();
 }
 
 // ── Load data ─────────────────────────────────────────────────────
@@ -857,294 +857,309 @@ document.getElementById('assignSave').onclick = function(){
 };
 
 // ── Results tab ────────────────────────────────────────────────────
-function renderResults(full) {
-  loadClasses(function(){
-    loadResults(full, function(){
-      loadAssignments(function(){
-        _renderResultsUI();
-      });
+function renderResults() {
+  VM.setTitle('Results');
+  var c = document.getElementById('vmContent');
+
+  /* ── State ──────────────────────────────────── */
+  var RS = {
+    classId:      '',
+    assignmentId: '',
+    mode:         '',
+    days:         14,
+    page:         1,
+    pageSize:     30,
+    total:        0,
+    totalPages:   1,
+    rows:         [],       // grouped rows currently displayed
+    recheckMap:   {},
+    loading:      false,
+  };
+
+  /* ── Shell ───────────────────────────────────── */
+  c.innerHTML =
+    // Toolbar
+    '<div class="vm-toolbar" style="margin-bottom:14px;flex-wrap:wrap;gap:8px">'+
+      // Class selector — required before loading
+      '<select class="vm-select" id="rsCls" style="min-width:170px">'+
+        '<option value="">— Chọn lớp —</option>'+
+        state.classes.map(function(cl){
+          return '<option value="'+VM.esc(cl.classId)+'">'+VM.esc(cl.className)+'</option>';
+        }).join('')+
+      '</select>'+
+      '<select class="vm-select" id="rsAssign" style="min-width:200px">'+
+        '<option value="">All assignments</option>'+
+      '</select>'+
+      '<select class="vm-select" id="rsMode">'+
+        '<option value="">All modes</option>'+
+        '<option value="homework">📝 Homework</option>'+
+        '<option value="inclass">🖥️ In-class</option>'+
+      '</select>'+
+      '<select class="vm-select" id="rsDays">'+
+        '<option value="14">Last 14 days</option>'+
+        '<option value="30">Last 30 days</option>'+
+        '<option value="0">All time</option>'+
+      '</select>'+
+      '<button class="vm-btn vm-btn-primary vm-btn-sm" id="rsLoad">Load results</button>'+
+    '</div>'+
+    // Hint when no class selected
+    '<div id="rsHint" style="text-align:center;padding:48px 20px;color:var(--vm-ink-3)">'+
+      '<div style="font-size:2rem;margin-bottom:10px">📊</div>'+
+      '<p style="font-size:.9rem">Chọn một lớp để xem kết quả.</p>'+
+    '</div>'+
+    '<div id="rsTableWrap"></div>';
+
+  /* ── Populate assignment dropdown from cache ── */
+  function refreshAssignDropdown(){
+    var sel = document.getElementById('rsAssign');
+    if(!sel) return;
+    var cls = document.getElementById('rsCls').value;
+    var list = state.assignments.filter(function(a){ return !cls || a.classId===cls; });
+    sel.innerHTML = '<option value="">All assignments</option>'+
+      list.map(function(a){
+        return '<option value="'+VM.esc(a.assignmentId)+'">'+VM.esc(a.title)+'</option>';
+      }).join('');
+  }
+
+  document.getElementById('rsCls').onchange = function(){
+    RS.page = 1;
+    refreshAssignDropdown();
+  };
+  loadAssignments(refreshAssignDropdown);
+
+  /* ── Load data ───────────────────────────────── */
+  function load(page){
+    var cls = document.getElementById('rsCls').value;
+    if(!cls){ VM.toast('Select a class first.','warn'); return; }
+    RS.classId      = cls;
+    RS.assignmentId = document.getElementById('rsAssign').value;
+    RS.mode         = document.getElementById('rsMode').value;
+    RS.days         = parseInt(document.getElementById('rsDays').value,10)||14;
+    RS.page         = page || 1;
+    RS.loading      = true;
+
+    document.getElementById('rsHint').style.display='none';
+    var wrap = document.getElementById('rsTableWrap');
+    wrap.innerHTML = '<div style="text-align:center;padding:32px;color:var(--vm-ink-3)">'+
+      '<span class="vm-spin" style="width:20px;height:20px;border-width:3px;display:inline-block"></span>'+
+      ' Loading…</div>';
+
+    // Load recheck map for this class's assignments
+    VM.api('result.recheckList', { assignmentId: RS.assignmentId || '__all__' }).then(function(rc){
+      if(rc&&rc.success) RS.recheckMap = rc.data||{};
     });
-  });
-}
 
-function _renderResultsUI() {
-  hideOverlay();
-  var content = document.getElementById('vmContent');
-  var assignments = state.assignments;
-
-  content.innerHTML =
-    '<div class="vm-toolbar">' +
-      '<div class="vm-search">'+VM.icon('search')+'<input id="rSearch" placeholder="Search name, Student ID…"></div>' +
-      '<select class="vm-select" id="rClass"><option value="">All classes</option>' +
-        state.classes.map(function(c){return '<option value="'+VM.esc(c.classId)+'">'+VM.esc(c.className)+'</option>';}).join('') +
-      '</select>' +
-      '<select class="vm-select" id="rAssign"><option value="">All assignments</option>' +
-        assignments.map(function(a){return '<option value="'+VM.esc(a.assignmentId)+'">'+VM.esc(a.title)+'</option>';}).join('') +
-      '</select>' +
-      '<select class="vm-select" id="rMode"><option value="">All modes</option>' +
-        '<option value="homework">Homework</option><option value="inclass">In-class</option>' +
-      '</select>' +
-      '<div class="vm-period-note">' +
-        (state.resultsFull
-          ? '<span>📅 All data</span><button class="vm-btn vm-btn-ghost vm-btn-sm" id="rTogglePeriod">Last 14 days</button>'
-          : '<span>📅 Last 14 days</span><button class="vm-btn vm-btn-ghost vm-btn-sm" id="rTogglePeriod">View all</button>') +
-      '</div>' +
-    '</div>' +
-    '<div id="rTableWrap"></div>';
-
-  var sortState = { col:'timestamp', dir:'desc' };
-
-  function filter() {
-    var q    = (document.getElementById('rSearch').value||'').toLowerCase();
-    var cls  = (document.getElementById('rClass').value||'');
-    var asId = (document.getElementById('rAssign').value||'');
-    var mode = (document.getElementById('rMode').value||'');
-    return state.results.filter(function(r){
-      if(cls  && r.class!==cls) return false;
-      if(asId && r.assignmentId!==asId) return false;
-      if(mode && r.mode!==mode) return false;
-      if(q && (r.name||'').toLowerCase().indexOf(q)<0 && (r.studentId||'').toLowerCase().indexOf(q)<0
-            && (r.title||'').toLowerCase().indexOf(q)<0) return false;
-      return true;
+    VM.api('result.getForTeacher', {
+      classId:      RS.classId,
+      assignmentId: RS.assignmentId,
+      mode:         RS.mode,
+      days:         RS.days,
+      page:         RS.page,
+      pageSize:     RS.pageSize,
+    }).then(function(res){
+      RS.loading = false;
+      if(!res||!res.success){ wrap.innerHTML='<div class="vm-empty"><p>Error: '+(res&&res.error||'Unknown')+'</p></div>'; return; }
+      RS.rows       = res.data || [];
+      RS.total      = res.meta.total;
+      RS.totalPages = res.meta.totalPages;
+      renderTable();
+    }).catch(function(e){
+      RS.loading = false;
+      wrap.innerHTML='<div class="vm-empty"><p>Connection error.</p></div>';
     });
   }
 
-  function sortRows(rows) {
-    var col=sortState.col, dir=sortState.dir;
-    return rows.slice().sort(function(a,b){
-      var av=a[col]||'', bv=b[col]||'';
-      if(col==='score'||col==='durationSec'||col==='correct'){av=parseFloat(av)||0;bv=parseFloat(bv)||0;}
-      else {av=String(av).toLowerCase();bv=String(bv).toLowerCase();}
-      if(av<bv) return dir==='asc'?-1:1;
-      if(av>bv) return dir==='asc'?1:-1;
-      return 0;
-    });
-  }
+  document.getElementById('rsLoad').onclick = function(){ load(1); };
 
-  var PAGE=25, page=1;
-
+  /* ── Render grouped table ────────────────────── */
   function renderTable(){
-    var rows = sortRows(filter());
-    var total= rows.length;
-    var start= (page-1)*PAGE, endR=Math.min(start+PAGE,total);
-    var slice= rows.slice(start,endR);
-    var wrap = document.getElementById('rTableWrap');
+    var wrap = document.getElementById('rsTableWrap');
+    if(!RS.rows.length){
+      wrap.innerHTML='<div class="vm-empty" style="padding:40px"><p>No results for this filter.</p></div>';
+      return;
+    }
 
-    // Determine if viewing inclass (all filtered rows are inclass)
-    var filterMode = (document.getElementById('rMode')||{}).value||'';
-    var filterAssign = (document.getElementById('rAssign')||{}).value||'';
-    var showInclass = filterMode==='inclass' || (filterAssign && (function(){
-      var a=assignments.find(function(x){return x.assignmentId===filterAssign;});
-      return a&&a.mode==='inclass';
-    })());
-
-    // Homework goal maps
+    // Goal map
     var goalMap = {};
-    assignments.forEach(function(a){ goalMap[a.assignmentId]=a.requiredGoals||3; });
-    var perfectMap = {};
-    state.results.forEach(function(r){
-      if(r.mode!=='homework') return;
-      var k = r.studentId+'__'+r.assignmentId;
-      perfectMap[k] = (perfectMap[k]||0) + (r.isPerfect?1:0);
-    });
+    state.assignments.forEach(function(a){ goalMap[a.assignmentId]=parseInt(a.requiredGoals,10)||3; });
 
-    // Recheck map (loaded async, stored in state.recheckMap)
-    var recheckMap = state.recheckMap || {};
+    var rowsHtml = RS.rows.map(function(r){
+      var reqGoal   = goalMap[r.assignmentId] || 3;
+      var goalMet   = r.mode==='homework' && r.perfectCount >= reqGoal;
+      var goalClass = goalMet ? 'met' : (r.perfectCount>0 ? 'partial' : 'none');
+      var scoreCol  = r.bestScore>=90?'var(--vm-ok)':(r.bestScore>=60?'#A66B00':'var(--vm-danger)');
+      var rcKey     = String(r.studentId)+'__'+String(r.assignmentId);
+      var rc        = RS.recheckMap[rcKey];
 
-    var baseCols = [
-      {key:'timestamp',  label:'Time',            sortable:true},
-      {key:'studentId',  label:'Student ID',      sortable:true},
-      {key:'name',       label:'Name',             sortable:true},
-      {key:'class',      label:'Class',            sortable:true},
-      {key:'title',      label:'Assignment',       sortable:true},
-      {key:'mode',       label:'Mode',             sortable:false},
-      {key:'score',      label:'Score',            sortable:true},
-      {key:'correct',    label:'Correct/Total',    sortable:false},
-      {key:'durationSec',label:'Duration',         sortable:true},
-      {key:'attempts',   label:'Attempts',         sortable:false},
-      {key:'goals',      label:'Goals',            sortable:false},
-    ];
-    var icCols = [
-      {key:'missedWords',label:'Missed Words',     sortable:false},
-      {key:'absent',     label:'Status',           sortable:false},
-      {key:'recheck',    label:'Re-check ✓',  sortable:false},
-    ];
-    var activeCols = showInclass ? baseCols.concat(icCols) : baseCols;
-    var colSpan = activeCols.length;
+      return '<tr class="rs-parent-row" data-sid="'+VM.esc(r.studentId)+'" '+
+               'data-aid="'+VM.esc(r.assignmentId)+'" data-expanded="false">'+
+        '<td style="width:28px;text-align:center">'+
+          '<button class="rs-expand-btn" title="Show run history" '+
+            'style="background:none;border:1px solid var(--vm-border);border-radius:4px;'+
+            'width:22px;height:22px;cursor:pointer;font-size:.75rem;color:var(--vm-ink-3);line-height:1">▶</button>'+
+        '</td>'+
+        '<td style="font-size:.82rem">'+VM.esc(VM.fmtDate(r.lastTimestamp))+'</td>'+
+        '<td><b>'+VM.esc(r.studentId)+'</b></td>'+
+        '<td>'+VM.esc(r.name)+'</td>'+
+        '<td style="font-size:.82rem">'+VM.esc(clsName(r.class))+'</td>'+
+        '<td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+VM.esc(r.title)+'">'+VM.esc(r.title)+'</td>'+
+        '<td>'+(r.mode==='homework'?'📝':'🖥️')+' <span style="font-size:.78rem">'+VM.esc(r.mode)+'</span></td>'+
+        '<td><b style="color:'+scoreCol+'">'+r.bestScore+'%</b>'+
+          (r.bestScore!==r.lastScore?'<span style="font-size:.72rem;color:var(--vm-ink-3);margin-left:4px">last:'+r.lastScore+'%</span>':'')+
+        '</td>'+
+        '<td style="text-align:center">'+r.attempts+'</td>'+
+        '<td>'+
+          (r.mode==='homework'?
+            '<span class="vm-goal '+goalClass+'">'+r.perfectCount+'/'+reqGoal+'</span>':'—')+
+        '</td>'+
+        (r.mode==='inclass'?
+          '<td style="text-align:center">'+
+            '<label style="cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px">'+
+              '<input type="checkbox" class="rw-recheck-cb" '+
+                'data-sid="'+VM.esc(r.studentId)+'" data-aid="'+VM.esc(r.assignmentId)+'" '+
+                (rc&&rc.checkedAt?'checked':'')+'>'+
+              (rc?'<span style="font-size:.68rem;color:var(--vm-ok)">'+VM.esc((rc.checkedAt||'').slice(0,10))+'</span>':
+                  '<span style="font-size:.68rem;color:var(--vm-ink-3)">Pending</span>')+
+            '</label>'+
+          '</td>':'<td>—</td>')+
+      '</tr>'+
+      // Hidden child row for run history
+      '<tr class="rs-child-row" data-sid="'+VM.esc(r.studentId)+'" data-aid="'+VM.esc(r.assignmentId)+'" '+
+        'style="display:none;background:var(--vm-surface-2)">'+
+        '<td colspan="11" style="padding:0">'+
+          '<div class="rs-runs-container" style="padding:8px 16px 12px 40px">'+
+            '<span style="font-size:.76rem;color:var(--vm-ink-3)">Loading runs…</span>'+
+          '</div>'+
+        '</td>'+
+      '</tr>';
+    }).join('');
+
+    // Pagination
+    var pager = '';
+    if(RS.totalPages > 1){
+      pager = '<div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:14px;font-size:.82rem">';
+      if(RS.page>1) pager+='<button class="vm-btn vm-btn-ghost vm-btn-sm rs-page" data-p="'+(RS.page-1)+'">← Prev</button>';
+      pager+='<span style="color:var(--vm-ink-2)">Page '+RS.page+' / '+RS.totalPages+' &nbsp;·&nbsp; '+RS.total+' records</span>';
+      if(RS.page<RS.totalPages) pager+='<button class="vm-btn vm-btn-ghost vm-btn-sm rs-page" data-p="'+(RS.page+1)+'">Next →</button>';
+      pager+='</div>';
+    } else {
+      pager='<div style="font-size:.76rem;color:var(--vm-ink-3);margin-top:10px;text-align:right">'+RS.total+' student × assignment groups</div>';
+    }
 
     wrap.innerHTML =
-      (total?'<div style="font-size:.8rem;color:var(--vm-ink-3);margin-bottom:8px">'+total+' results</div>':'') +
-      (showInclass?
-        '<div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">'+
-          '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="rMarkAbsent">Mark Absent (close session)</button>'+
-          '<span style="font-size:.76rem;color:var(--vm-ink-3)">Marks non-submitted students as absent with all class missed words</span>'+
-        '</div>':'') +
-      '<div class="vm-table-wrap" style="overflow-x:auto"><table class="vm-table"><thead><tr>' +
-        activeCols.map(function(c){
-          if(!c.sortable) return '<th>'+VM.esc(c.label)+'</th>';
-          var cls2 = 'sortable';
-          if(sortState.col===c.key) cls2+=' sort-'+(sortState.dir==='asc'?'asc':'desc');
-          return '<th class="'+cls2+'" data-sortcol="'+c.key+'">'+VM.esc(c.label)+'<span class="sa"></span></th>';
-        }).join('') +
-      '</tr></thead><tbody>' +
-      (slice.length ? slice.map(function(r){
-        var pKey = r.studentId+'__'+r.assignmentId;
-        var reqGoal = goalMap[r.assignmentId]||3;
-        var perfCount = perfectMap[pKey]||0;
-        var attemptRows = state.results.filter(function(x){return x.studentId===r.studentId&&x.assignmentId===r.assignmentId;}).length;
+      '<div style="overflow-x:auto">'+
+      '<table class="vm-table"><thead><tr>'+
+        '<th style="width:28px"></th>'+
+        '<th>Last attempt</th><th>Student ID</th><th>Name</th><th>Class</th>'+
+        '<th>Assignment</th><th>Mode</th><th>Best score</th>'+
+        '<th>Attempts</th><th>Goals</th><th>Re-check</th>'+
+      '</tr></thead>'+
+      '<tbody id="rsTbody">'+rowsHtml+'</tbody>'+
+      '</table></div>'+pager;
 
-        var goalChip = '';
-        if(r.mode==='homework'){
-          var gc = perfCount>=reqGoal?(perfCount>reqGoal?'over':'met'):(perfCount>0?'partial':'none');
-          goalChip = '<span class="vm-goal '+gc+'">'+perfCount+'/'+reqGoal+'</span>';
-        } else { goalChip='—'; }
+    bindTableEvents();
+  }
 
-        // In-class extras
-        var missedCell='', statusCell='', recheckCell='';
-        if(showInclass){
-          // Missed words
-          var mw=[];
-          try{ mw=JSON.parse(r.missedWords||'[]'); }catch(e){ mw=String(r.missedWords||'').split(',').filter(Boolean); }
-          var mwColor = mw.length===0?'var(--vm-ok)':(mw.length<=3?'#A66B00':'var(--vm-danger)');
-          missedCell='<td style="max-width:220px">'+
-            (mw.length?'<div style="display:flex;flex-wrap:wrap;gap:3px">'+
-              mw.map(function(w){return'<span style="background:#FEF3D6;color:#7A5000;border-radius:4px;padding:1px 6px;font-size:.72rem;font-weight:600">'+VM.esc(w)+'</span>';}).join('')+
-            '</div>':'<span style="color:var(--vm-ok);font-size:.8rem">✓ No missed</span>')+
-          '</td>';
+  /* ── Bind expand + recheck ───────────────────── */
+  function bindTableEvents(){
+    // Accordion expand
+    VM.els('.rs-expand-btn').forEach(function(btn){
+      btn.onclick=function(){
+        var parentRow = btn.closest('tr.rs-parent-row');
+        var sid = parentRow.getAttribute('data-sid');
+        var aid = parentRow.getAttribute('data-aid');
+        var expanded = parentRow.getAttribute('data-expanded')==='true';
+        var childRow = document.querySelector('tr.rs-child-row[data-sid="'+sid+'"][data-aid="'+aid+'"]');
+        if(!childRow) return;
 
-          // Status
-          var statusLabel, statusColor;
-          if(r.absent==='TRUE'||r.absent===true){
-            statusLabel='⚠️ Absent'; statusColor='var(--vm-danger)';
-          } else if(r.timedOut==='TRUE'||r.timedOut===true){
-            statusLabel='⏰ Timed out'; statusColor='#A66B00';
-          } else {
-            statusLabel='✓ Submitted'; statusColor='var(--vm-ok)';
+        if(expanded){
+          parentRow.setAttribute('data-expanded','false');
+          btn.textContent='▶';
+          childRow.style.display='none';
+        } else {
+          parentRow.setAttribute('data-expanded','true');
+          btn.textContent='▼';
+          childRow.style.display='';
+          // Lazy-load runs if not already loaded
+          var container = childRow.querySelector('.rs-runs-container');
+          if(container && container.querySelector('span')){
+            loadRuns(sid, aid, container);
           }
-          statusCell='<td><span style="color:'+statusColor+';font-size:.8rem;font-weight:600">'+statusLabel+'</span></td>';
-
-          // Recheck
-          var rc=recheckMap[String(r.studentId).trim()+'__'+String(r.assignmentId)];
-          var isChecked=!!(rc&&rc.checkedAt);
-          recheckCell='<td style="text-align:center">'+
-            '<label style="cursor:pointer;display:flex;align-items:center;gap:5px;justify-content:center">'+
-              '<input type="checkbox" class="rw-recheck-cb" '+
-                'data-sid="'+VM.esc(String(r.studentId))+'" '+
-                'data-aid="'+VM.esc(String(r.assignmentId))+'" '+
-                'data-title="'+VM.esc(r.title||'')+'" '+
-                'data-sname="'+VM.esc(r.name||'')+'" '+
-                'data-cls="'+VM.esc(r.class||'')+'" '+
-                'data-mw="'+VM.esc(JSON.stringify(mw))+'" '+
-                'data-ptype="'+(r.absent==='TRUE'?'absent':(r.timedOut==='TRUE'?'timeout':'wrong'))+'" '+
-                (isChecked?'checked':'')+'>'+
-              (isChecked?'<span style="font-size:.72rem;color:var(--vm-ok)">'+VM.esc(rc.checkedAt.slice(0,10))+'</span>':'<span style="font-size:.72rem;color:var(--vm-ink-3)">Pending</span>')+
-            '</label>'+
-          '</td>';
         }
-
-        return '<tr>' +
-          '<td style="font-size:.8rem">'+VM.esc(VM.fmtDate(r.timestamp))+'</td>' +
-          '<td>'+VM.esc(r.studentId)+'</td>' +
-          '<td>'+VM.esc(r.name)+'</td>' +
-          '<td>'+VM.esc(clsName(r.class))+'</td>' +
-          '<td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+VM.esc(r.title||r.assignmentId)+'">'+VM.esc(r.title||r.assignmentId)+'</td>' +
-          '<td>'+(r.mode==='homework'?'📝':'🖥️')+' '+VM.esc(r.mode||'')+'</td>' +
-          '<td class="vm-score '+scoreClass(r.score)+'">'+r.score+'%</td>' +
-          '<td>'+VM.esc(r.correct+'/'+r.total)+'</td>' +
-          '<td>'+VM.fmtDuration(r.durationSec)+'</td>' +
-          '<td>'+attemptRows+'</td>' +
-          '<td>'+goalChip+'</td>' +
-          missedCell + statusCell + recheckCell +
-        '</tr>';
-      }).join('') : '<tr><td colspan="'+colSpan+'" style="text-align:center;padding:32px;color:var(--vm-ink-3)">No data for this period.</td></tr>') +
-      '</tbody></table></div>' +
-      renderPager(total);
-
-    // Sort handlers
-    wrap.querySelectorAll('[data-sortcol]').forEach(function(th){
-      th.onclick=function(){
-        var col=th.getAttribute('data-sortcol');
-        if(sortState.col===col) sortState.dir=sortState.dir==='asc'?'desc':'asc';
-        else{sortState.col=col;sortState.dir='asc';}
-        renderTable();
       };
     });
-    wrap.querySelectorAll('.vm-page-btn').forEach(function(btn){
-      btn.onclick=function(){var p=parseInt(btn.getAttribute('data-page'),10);if(!isNaN(p)){page=p;renderTable();}};
+
+    // Pagination
+    VM.els('.rs-page').forEach(function(btn){
+      btn.onclick=function(){ load(parseInt(btn.getAttribute('data-p'),10)); };
     });
 
-    // Recheck checkbox handlers
-    wrap.querySelectorAll('.rw-recheck-cb').forEach(function(cb){
+    // Recheck checkboxes
+    VM.els('.rw-recheck-cb').forEach(function(cb){
       cb.onchange=function(){
-        if(!cb.checked){return;}  // only handle checking, not unchecking
-        var sid=cb.getAttribute('data-sid'),aid=cb.getAttribute('data-aid');
-        var mw=[]; try{mw=JSON.parse(cb.getAttribute('data-mw')||'[]');}catch(e){}
+        if(!cb.checked) return;
+        var sid=cb.getAttribute('data-sid'), aid=cb.getAttribute('data-aid');
+        var r=RS.rows.find(function(x){return x.studentId===sid&&x.assignmentId===aid;})||{};
         showOverlay('Saving recheck…');
         VM.api('result.recheckSave',{
-          assignmentId:aid, title:cb.getAttribute('data-title')||'',
-          studentId:sid, studentName:cb.getAttribute('data-sname')||'',
-          class:cb.getAttribute('data-cls')||'',
-          missedWords:mw.join(', '),
-          penaltyType:cb.getAttribute('data-ptype')||'wrong',
-          teacherEmail:sess.email,
-          note:''
+          assignmentId:aid, studentId:sid, studentName:r.name||'',
+          class:r.class||'', teacherEmail:sess.email,
+          penaltyType: r.mode==='inclass'?'wrong':'hw', note:''
         }).then(function(res){
           hideOverlay();
           if(res&&res.success){
+            RS.recheckMap[sid+'__'+aid]={checkedAt:new Date().toISOString().slice(0,10)};
             VM.toast('Re-check saved.','ok');
-            // Update local recheckMap
-            state.recheckMap = state.recheckMap||{};
-            state.recheckMap[sid+'__'+aid]={checkedAt:new Date().toISOString().slice(0,10),checkedBy:sess.email};
-            renderTable();
           } else VM.toast('Error: '+(res&&res.error),'err');
         }).catch(function(){hideOverlay();VM.toast('Connection error.','err');});
       };
     });
-
-    // Mark Absent button
-    var mab=document.getElementById('rMarkAbsent');
-    if(mab) mab.onclick=function(){
-      var aid=filterAssign;
-      if(!aid){VM.toast('Filter by a specific In-class assignment first.','warn');return;}
-      var a=assignments.find(function(x){return x.assignmentId===aid;});
-      if(!a){VM.toast('Assignment not found.','err');return;}
-      if(!confirm('Mark all non-submitted students as Absent? This will assign them all missed words from the class session.')) return;
-      showOverlay('Recording absences…');
-      VM.api('result.absentPenalty',{
-        assignmentId:aid, classId:a.classId, title:a.title||'', total:a.vocab?a.vocab.length:0
-      }).then(function(res){
-        hideOverlay();
-        if(res&&res.success){
-          VM.toast(res.data.absentCount+' absent student(s) recorded.','ok');
-          renderResults(state.resultsFull);
-        } else VM.toast('Error: '+(res&&res.error),'err');
-      }).catch(function(){hideOverlay();VM.toast('Connection error.','err');});
-    };
   }
 
-  function renderPager(total){
-    var pages=Math.ceil(total/PAGE); if(pages<=1) return '';
-    var html='<div class="vm-pagination">';
-    html+='<button class="vm-page-btn" data-page="'+(page-1)+'" '+(page<=1?'disabled':'')+'>‹</button>';
-    for(var i=Math.max(1,page-2);i<=Math.min(pages,page+2);i++){
-      html+='<button class="vm-page-btn'+(i===page?' active':'')+'" data-page="'+i+'">'+i+'</button>';
-    }
-    html+='<button class="vm-page-btn" data-page="'+(page+1)+'" '+(page>=pages?'disabled':'')+'>›</button>';
-    return html+'</div>';
+  /* ── Lazy-load run detail ────────────────────── */
+  function loadRuns(sid, aid, container){
+    container.innerHTML='<span style="font-size:.76rem;color:var(--vm-ink-3)">⏳ Loading…</span>';
+    VM.api('result.getForTeacher',{
+      classId: RS.classId, studentId: sid, assignmentId: aid,
+      days: 0, groupBy: 'all'
+    }).then(function(res){
+      if(!res||!res.success||!res.data.length){
+        container.innerHTML='<span style="font-size:.76rem;color:var(--vm-ink-3)">No detail found.</span>';
+        return;
+      }
+      container.innerHTML=
+        '<table style="width:100%;font-size:.78rem;border-collapse:collapse">'+
+        '<thead><tr style="color:var(--vm-ink-3);font-size:.7rem;text-transform:uppercase">'+
+          '<th style="text-align:left;padding:3px 8px">#</th>'+
+          '<th style="text-align:left;padding:3px 8px">Time</th>'+
+          '<th style="text-align:left;padding:3px 8px">Score</th>'+
+          '<th style="text-align:left;padding:3px 8px">Correct</th>'+
+          '<th style="text-align:left;padding:3px 8px">Duration</th>'+
+          '<th style="text-align:left;padding:3px 8px">Status</th>'+
+        '</tr></thead>'+
+        '<tbody>'+
+        res.data.map(function(run,i){
+          var sc=parseFloat(run.score)||0;
+          var scCol=sc===100?'var(--vm-ok)':(sc>=60?'#A66B00':'var(--vm-danger)');
+          var status=run.absent?'⚠️ Absent':(run.timedOut?'⏰ Timeout':'✓ Submitted');
+          return '<tr style="border-top:1px solid var(--vm-border-2)">'+
+            '<td style="padding:4px 8px;color:var(--vm-ink-3)">'+(i+1)+'</td>'+
+            '<td style="padding:4px 8px">'+VM.esc(VM.fmtDate(run.timestamp))+'</td>'+
+            '<td style="padding:4px 8px"><b style="color:'+scCol+'">'+sc+'%</b>'+
+              (run.isPerfect?' ★':'')+'</td>'+
+            '<td style="padding:4px 8px">'+VM.esc(run.correct+'/'+run.total)+'</td>'+
+            '<td style="padding:4px 8px">'+VM.fmtDuration(run.durationSec)+'</td>'+
+            '<td style="padding:4px 8px;font-size:.72rem">'+status+'</td>'+
+          '</tr>';
+        }).join('')+
+        '</tbody></table>';
+    }).catch(function(){
+      container.innerHTML='<span style="font-size:.76rem;color:var(--vm-danger)">Connection error.</span>';
+    });
   }
-
-  ['rSearch','rClass','rAssign','rMode'].forEach(function(id){
-    var el=document.getElementById(id);
-    if(el) el.addEventListener(id==='rSearch'?'input':'change',function(){page=1;renderTable();});
-  });
-
-  var toggleBtn = document.getElementById('rTogglePeriod');
-  if (toggleBtn) toggleBtn.onclick = function(){ renderResults(!state.resultsFull); };
-
-  renderTable();
 }
 
-// ── HW Book ──────────────────────────────────────────────────────────
+
 function renderHWBook(){
   loadClasses(function(){
     loadAssignments(function(){
@@ -1315,8 +1330,8 @@ function renderHWBook(){
         });
       });
 
-      // Initial load results for submission counts
-      loadResults(false, renderTable);
+      // Results loaded on demand in Results tab — show cached count if available
+      renderTable();
     });
   });
 }
