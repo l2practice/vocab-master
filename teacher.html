@@ -316,12 +316,10 @@ function loadAssignments(cb) {
 }
 
 function loadResults(full, cb) {
-  var cids = state.classes.map(function(c){ return c.classId; });
-  if (!cids.length) { state.results = []; if(cb) cb(); return; }
-  VM.api('result.getForTeacher', { classIds: cids, full: full }).then(function(res) {
-    if (res && res.success) { state.results = res.data || []; state.resultsFull = full; }
-    if (cb) cb();
-  });
+  // Overview KPIs use assignments/classes only — do NOT call result.getForTeacher
+  // (that API now requires a single classId, not classIds array)
+  state.results = [];
+  if (cb) cb();
 }
 
 // ── Overview ──────────────────────────────────────────────────────
@@ -331,10 +329,8 @@ function renderOverview() {
       loadResults(false, function() {
         hideOverlay();
         var content = document.getElementById('vmContent');
-        var totalStu = 0; // estimate from results
-        var stuSet = {};
-        state.results.forEach(function(r){ stuSet[r.studentId]=1; });
-        totalStu = Object.keys(stuSet).length;
+        var totalStu = 0; // total enrolled students across all classes
+        state.classes.forEach(function(){ totalStu = '—'; }); // shown as — until roster loaded
 
         var hwCount = state.assignments.filter(function(a){ return a.mode==='homework'; }).length;
         var icCount = state.assignments.filter(function(a){ return a.mode==='inclass'; }).length;
@@ -345,7 +341,7 @@ function renderOverview() {
             kpi(state.classes.length,'Classes','') +
             kpi(hwCount,'Homework','open') +
             kpi(icCount,'In-class','open') +
-            kpi(totalStu,'Students','active (14 days)') +
+            kpi(totalStu,'Students','enrolled') +
           '</div>' +
           '<div style="display:flex;gap:12px;margin-bottom:16px">' +
             '<button class="vm-btn vm-btn-primary" id="ovNewHw">+ New Homework</button>' +

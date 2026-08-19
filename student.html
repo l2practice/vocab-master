@@ -254,6 +254,33 @@ function isPerfectGoalMet(a,res){
   return res.filter(function(r){return r.isPerfect;}).length>=req;
 }
 
+/* ── canStartInclass guard ── */
+function canStartInclass(asgn) {
+  if (asgn.mode !== 'inclass') return true;
+  // Use sessionStatus from server if available
+  var st = asgn.sessionStatus;
+  if (!st && asgn.sessionStart) {
+    var start = new Date(asgn.sessionStart);
+    var end = asgn.sessionEnd ? new Date(asgn.sessionEnd)
+              : new Date(start.getTime() + (asgn.sessionDurationMin||0)*60000);
+    var now = Date.now();
+    st = now < start.getTime() ? 'upcoming' : now > end.getTime() ? 'closed' : 'open';
+  }
+  if (st === 'upcoming') { VM.toast('Chưa đến giờ làm bài.', 'warn'); return false; }
+  if (st === 'closed')   { VM.toast('Session đã kết thúc.', 'warn');  return false; }
+  return true;
+}
+
+function fmtSessionTime(isoStr) {
+  if (!isoStr) return '';
+  var d = new Date(isoStr);
+  if (isNaN(d)) return isoStr;
+  return d.toLocaleString('vi-VN', {
+    day:'2-digit', month:'2-digit', year:'numeric',
+    hour:'2-digit', minute:'2-digit', hour12:false
+  });
+}
+
 function renderCards(items){
   if(!items.length) return '<div class="vm-empty"><p>No assignments.</p></div>';
   return '<div class="vm-assign-grid">'+items.map(function(a){
@@ -263,12 +290,44 @@ function renderCards(items){
     var done=a.mode==='homework'&&perf>=req;
     var pct=a.mode==='homework'?Math.min(100,Math.round(perf/req*100)):0;
     var dl=a.deadline?'⏰ '+VM.esc(a.deadline):'∞ No deadline';
+
+    // In-class session info + status badge
+    var icMeta='', btnLabel=att?'Try again →':'Start →', btnDisabled=false;
+    if(a.mode==='inclass'){
+      var st=a.sessionStatus;
+      // Re-compute if missing
+      if(!st && a.sessionStart){
+        var _s=new Date(a.sessionStart).getTime();
+        var _e=a.sessionEnd?new Date(a.sessionEnd).getTime():_s+(a.sessionDurationMin||0)*60000;
+        var _n=Date.now();
+        st=_n<_s?'upcoming':_n>_e?'closed':'open';
+      }
+      var badge='', badgeColor='';
+      if(st==='upcoming'){ badge='⏳ Chưa đến giờ'; badgeColor='#A66B00'; btnDisabled=true; btnLabel='Chưa mở'; }
+      else if(st==='closed'){ badge='✓ Đã kết thúc'; badgeColor='var(--vm-ink-3)'; btnDisabled=true; btnLabel=att?'Đã nộp':'Vắng'; }
+      else { badge='🟢 Đang mở'; badgeColor='var(--vm-ok)'; btnLabel=att?'Làm lại →':'Bắt đầu →'; }
+
+      var sessionLine='';
+      if(a.sessionStart){
+        sessionLine='<div style="font-size:.74rem;color:var(--vm-ink-3);margin-top:3px">'+
+          '🕐 '+VM.esc(fmtSessionTime(a.sessionStart))+
+          (a.sessionDurationMin?' · '+a.sessionDurationMin+' phút':'')+
+        '</div>';
+      }
+      icMeta='<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'+
+               '<span style="font-size:.75rem;font-weight:700;color:'+badgeColor+'">'+badge+'</span>'+
+             '</div>'+sessionLine;
+    }
+
     return '<div class="vm-assign-card'+(done?' complete':'')+'" data-open-asgn="'+VM.esc(a.assignmentId)+'">'+
       '<div style="display:flex;justify-content:space-between;gap:8px">'+
         '<div class="vm-assign-card-title">'+VM.esc(a.title)+'</div>'+
         (done?'<span style="color:var(--vm-ok);font-size:1.1rem;flex:0 0 auto">✓</span>':'')+
       '</div>'+
-      '<div class="vm-assign-meta"><span>📚 '+(a.vocab||[]).length+' words</span><span>'+dl+'</span></div>'+
+      icMeta+
+      '<div class="vm-assign-meta"><span>📚 '+(a.vocab||[]).length+' words</span>'+
+        (a.mode!=='inclass'?'<span>'+dl+'</span>':'')+
+      '</div>'+
       (a.mode==='homework'?
         '<div class="vm-assign-progress">'+
           '<div style="display:flex;justify-content:space-between;font-size:.76rem;font-weight:600">'+
@@ -278,19 +337,26 @@ function renderCards(items){
           '<div class="vm-assign-pbar"><div class="vm-assign-pfill'+(done?' done':'')+'" style="width:'+pct+'%"></div></div>'+
         '</div>':
         '<div style="font-size:.76rem;color:var(--vm-ink-3)">Attempts: '+att+'</div>')+
-      '<button class="vm-btn vm-btn-primary vm-btn-block" style="padding:10px;font-size:.88rem;margin-top:6px">'+(att?'Try again →':'Start →')+'</button>'+
+      '<button class="vm-btn vm-btn-primary vm-btn-block" '+
+        (btnDisabled?'disabled style="opacity:.5;cursor:not-allowed;padding:10px;font-size:.88rem;margin-top:6px"':'style="padding:10px;font-size:.88rem;margin-top:6px"')+
+        '>'+btnLabel+'</button>'+
     '</div>';
   }).join('')+'</div>';
 }
 
 function bindCards(){
   VM.els('[data-open-asgn]').forEach(function(card){
-    card.onclick=function(){
+    card.onclick=function(e){
+      // Ignore clicks directly on disabled button
+      if(e.target.tagName==='BUTTON'&&e.target.disabled) return;
       var aId=card.getAttribute('data-open-asgn');
       var asgn=S.assignments.find(function(a){return a.assignmentId===aId;});
       if(!asgn) return;
       if(asgn.mode==='homework') openReview(asgn);
-      else openQuizDirect(asgn);
+      else {
+        if(!canStartInclass(asgn)) return;
+        openQuizDirect(asgn);
+      }
     };
   });
 }
@@ -410,11 +476,47 @@ function openQuizDirect(asgn){
   startQuiz(asgn);
 }
 
+var _icTimerInterval = null;
+
+function clearICTimer(){
+  if(_icTimerInterval){ clearInterval(_icTimerInterval); _icTimerInterval=null; }
+}
+
 function startQuiz(asgn){
   var vocab=asgn.vocab||[];
   if(!vocab.length){document.getElementById('quizArea').innerHTML='<div class="vm-empty"><p>No vocabulary in this assignment.</p></div>';return;}
   S.quiz=VM.buildQuiz(vocab,{isReview:asgn.mode==='inclass',total:65});
-  S.quizState={asgn:asgn,qIdx:0,correct:0,startTs:Date.now()};
+  S.quizState={asgn:asgn,qIdx:0,correct:0,startTs:Date.now(),wrongAnswers:{}};
+  clearICTimer();
+
+  // BUG 5c: inclass session countdown timer
+  if(asgn.mode==='inclass' && (asgn.sessionEnd || asgn.sessionStart)){
+    var endTs;
+    if(asgn.sessionEnd) endTs = new Date(asgn.sessionEnd).getTime();
+    else endTs = new Date(asgn.sessionStart).getTime() + (asgn.sessionDurationMin||45)*60000;
+
+    if(!isNaN(endTs) && endTs > Date.now()){
+      _icTimerInterval = setInterval(function(){
+        var remaining = Math.max(0, endTs - Date.now());
+        var el = document.getElementById('icCountdown');
+        if(el){
+          var m = Math.floor(remaining/60000);
+          var s = Math.floor((remaining%60000)/1000);
+          el.textContent = '⏱ ' + m + ':' + (s<10?'0':'') + s;
+          el.style.color = remaining < 120000 ? 'var(--vm-danger)' : '';
+        }
+        if(remaining <= 0){
+          clearICTimer();
+          if(S.quizState && !S.quizState.timedOut){
+            S.quizState.timedOut = true;
+            VM.toast('⏰ Hết giờ! Auto-submit...', 'warn', 3000);
+            setTimeout(showResult, 1500);
+          }
+        }
+      }, 1000);
+    }
+  }
+
   renderQ();
 }
 
@@ -575,11 +677,27 @@ function showResult(){
         '<button class="vm-btn vm-btn-ghost" id="backRes" style="padding:11px 20px">← Back</button>'+
       '</div>'+
     '</div>';
-  document.getElementById('tryAgain').onclick=function(){
-    if(asgn.mode==='readwise' && _currentRWArticle) openRWQuiz(_currentRWArticle);
-    else if(asgn.mode==='readwise') renderReadWise();  // vocab quiz retry → back to RW
-    else startQuiz(asgn);
-  };
+  // BUG 5d: no retry for closed/timedOut inclass sessions
+  var isICClosed = asgn.mode==='inclass' &&
+    (qs.timedOut || asgn.sessionStatus==='closed' ||
+     (function(){
+       if(!asgn.sessionEnd && !asgn.sessionStart) return false;
+       var endT = asgn.sessionEnd ? new Date(asgn.sessionEnd).getTime()
+                 : new Date(asgn.sessionStart).getTime()+(asgn.sessionDurationMin||0)*60000;
+       return Date.now() > endT;
+     })());
+  var tryAgainBtn = document.getElementById('tryAgain');
+  if(tryAgainBtn){
+    if(isICClosed){
+      tryAgainBtn.style.display='none';
+    } else {
+      tryAgainBtn.onclick=function(){
+        if(asgn.mode==='readwise' && _currentRWArticle) openRWQuiz(_currentRWArticle);
+        else if(asgn.mode==='readwise') renderReadWise();
+        else startQuiz(asgn);
+      };
+    }
+  }
   document.getElementById('backRes').onclick=function(){
     if(asgn.mode==='readwise' && _currentRWArticle) renderRWReader(_currentRWArticle);
     else if(asgn.mode==='readwise') renderReadWise();
@@ -1617,6 +1735,7 @@ VM.Chat.init({ role:'student', context:'' });
 // Update chat context when student enters homework or readwise
 var _origSwitchTab = switchTab;
 switchTab = function(id){
+  if(typeof clearICTimer==='function') clearICTimer();
   _origSwitchTab(id);
   if(id==='homework') VM.Chat.setContext('Student is studying homework vocabulary assignments.');
   else if(id==='reading') VM.Chat.setContext('Student is using ReadWise self-study reading mode.');
