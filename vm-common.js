@@ -389,14 +389,16 @@
   VM.buildQuiz = function(vocab, opts) {
     opts = opts||{};
     var isReview = !!opts.isReview;
-    var total    = opts.total || 65;
+    // In-class: cap at actual vocab size (no repeats, no padding)
+    // Homework: up to 65 with spaced repetition
+    var total = isReview ? Math.min(opts.total||65, vocab.length) : (opts.total||65);
     if(!vocab||!vocab.length) return {questions:[],total:0,check:function(){return{correct:false,correctAnswer:''};} };
 
     var pool, questions=[];
 
     if(isReview){
-      // In-class: each word ONCE, no repeats
-      pool = _shuffle(vocab).slice(0,total);
+      // In-class: each word EXACTLY ONCE, total = min(65, vocab.length)
+      pool = _shuffle(vocab).slice(0, total);
       pool.forEach(function(word,i){
         var q = (i%4===3)?_buildFITB(word):_buildMC(word,MC_MODES[i%MC_MODES.length],vocab);
         if(q) questions.push(q);
