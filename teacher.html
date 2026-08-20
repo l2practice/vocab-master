@@ -206,6 +206,81 @@
   </div>
 </div>
 
+<div class="vm-modal-bg" id="translateModal">
+  <div class="vm-modal" style="max-width:700px;max-height:90vh;overflow-y:auto">
+    <button class="vm-modal-close" id="translateModalClose">✕</button>
+    <div class="vm-modal-title">✏️ Tạo bài Luyện Dịch</div>
+
+    <div style="display:flex;flex-direction:column;gap:14px">
+
+      <div class="vm-row" style="gap:12px;flex-wrap:wrap">
+        <div class="vm-field" style="flex:1;min-width:160px">
+          <label class="vm-label">Lớp <span style="color:var(--vm-danger)">*</span></label>
+          <select class="vm-input" id="tr-class" onchange="trClassChanged()">
+            <option value="">— Chọn lớp —</option>
+          </select>
+        </div>
+        <div class="vm-field" style="flex:1;min-width:200px">
+          <label class="vm-label">Bài Homework nguồn <span style="color:var(--vm-danger)">*</span></label>
+          <select class="vm-input" id="tr-hw-src" onchange="trHWChanged()">
+            <option value="">— Chọn homework —</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="vm-field">
+        <label class="vm-label">Tiêu đề</label>
+        <input class="vm-input" id="tr-title" placeholder="Dịch · London Underground Railway">
+      </div>
+
+      <div class="vm-row" style="gap:12px;flex-wrap:wrap">
+        <div class="vm-field" style="flex:1;min-width:120px">
+          <label class="vm-label">Pass Score (%)</label>
+          <input class="vm-input" id="tr-pass" type="number" min="50" max="100" value="85">
+        </div>
+        <div class="vm-field" style="flex:1;min-width:180px">
+          <label class="vm-label">Session Start <span style="color:var(--vm-danger)">*</span></label>
+          <input class="vm-input" id="tr-start" type="datetime-local">
+        </div>
+        <div class="vm-field" style="flex:1;min-width:180px">
+          <label class="vm-label">Deadline</label>
+          <input class="vm-input" id="tr-deadline" type="datetime-local">
+        </div>
+      </div>
+
+      <div style="background:var(--vm-surface-2);border:1px solid var(--vm-border-2);border-radius:var(--vm-r-sm);padding:14px 16px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+          <span style="font-size:.85rem;font-weight:600">✨ Sinh 30 câu bằng AI</span>
+          <span style="font-size:.75rem;color:var(--vm-ink-3)">(dùng Gemini key giáo viên)</span>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="vm-btn vm-btn-primary vm-btn-sm" id="trGenBtn" onclick="trGenItems()">✨ Sinh câu</button>
+          <button class="vm-btn vm-btn-ghost vm-btn-sm" id="trRegenBtn" style="display:none" onclick="trGenItems()">↺ Thử lại</button>
+        </div>
+        <div id="trGenStatus" style="font-size:.8rem;color:var(--vm-ink-3);margin-top:8px;min-height:16px"></div>
+      </div>
+
+      <div id="trPreviewWrap" style="display:none">
+        <div style="font-size:.78rem;font-weight:700;color:var(--vm-ink-2);margin-bottom:8px">
+          📋 Preview <span id="trItemCount"></span>
+        </div>
+        <div style="max-height:260px;overflow-y:auto;border:1px solid var(--vm-border-2);border-radius:var(--vm-r-sm)">
+          <table class="vm-table" style="font-size:.78rem">
+            <thead><tr><th>#</th><th>Chiều</th><th>Câu gốc</th><th>Đáp án mẫu</th><th>Vocab</th></tr></thead>
+            <tbody id="trItemsTbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="vm-modal-footer">
+      <button class="vm-btn vm-btn-ghost" onclick="closeTrModal()">Huỷ</button>
+      <button class="vm-btn vm-btn-primary" id="trSaveBtn" disabled onclick="saveTrSet()">💾 Lưu bài dịch</button>
+    </div>
+  </div>
+</div>
+
 <script src="vm-common.js"></script>
 <script>
 if (typeof VM === 'undefined') { location.href='login.html'; throw new Error('no VM'); }
@@ -1375,99 +1450,34 @@ function renderHWBook(){
 
 // ── Translate ─────────────────────────────────────────────────────────
 
-/* ── Translate modal HTML (injected once) ── */
-function injectTranslateModal(){
-  if(document.getElementById('trModal')) return;
-  var el=document.createElement('div');
-  el.id='trModal';
-  el.className='vm-modal-overlay';
-  el.innerHTML=
-    '<div class="vm-modal" style="max-width:700px">'+
-      '<div class="vm-modal-header"><h2>✏️ Tạo bài Luyện Dịch</h2>'+
-        '<button class="vm-modal-close" onclick="closeTrModal()">✕</button></div>'+
-      '<div class="vm-modal-body" style="display:flex;flex-direction:column;gap:14px">'+
-
-        '<div class="vm-row" style="gap:12px;flex-wrap:wrap">'+
-          '<div class="vm-field" style="flex:1;min-width:160px">'+
-            '<label class="vm-label">Lớp <span style="color:var(--vm-danger)">*</span></label>'+
-            '<select class="vm-input" id="tr-class" onchange="trClassChanged()">'+
-              '<option value="">— Chọn lớp —</option></select>'+
-          '</div>'+
-          '<div class="vm-field" style="flex:1;min-width:200px">'+
-            '<label class="vm-label">Bài Homework nguồn <span style="color:var(--vm-danger)">*</span></label>'+
-            '<select class="vm-input" id="tr-hw-src" onchange="trHWChanged()">'+
-              '<option value="">— Chọn homework —</option></select>'+
-          '</div>'+
-        '</div>'+
-
-        '<div class="vm-field">'+
-          '<label class="vm-label">Tiêu đề</label>'+
-          '<input class="vm-input" id="tr-title" placeholder="Dịch · London Underground Railway">'+
-        '</div>'+
-
-        '<div class="vm-row" style="gap:12px;flex-wrap:wrap">'+
-          '<div class="vm-field" style="flex:1;min-width:140px">'+
-            '<label class="vm-label">Pass Score (%)</label>'+
-            '<input class="vm-input" id="tr-pass" type="number" min="50" max="100" value="85">'+
-          '</div>'+
-          '<div class="vm-field" style="flex:1;min-width:180px">'+
-            '<label class="vm-label">Session Start <span style="color:var(--vm-danger)">*</span></label>'+
-            '<input class="vm-input" id="tr-start" type="datetime-local">'+
-          '</div>'+
-          '<div class="vm-field" style="flex:1;min-width:180px">'+
-            '<label class="vm-label">Deadline</label>'+
-            '<input class="vm-input" id="tr-deadline" type="datetime-local">'+
-          '</div>'+
-        '</div>'+
-
-        '<div style="background:var(--vm-surface-2);border:1px solid var(--vm-border-2);border-radius:var(--vm-r-sm);padding:14px 16px">'+
-          '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'+
-            '<span style="font-size:.85rem;font-weight:600">✨ Sinh 30 câu bằng AI</span>'+
-            '<span style="font-size:.75rem;color:var(--vm-ink-3)">(dùng Gemini key giáo viên)</span>'+
-          '</div>'+
-          '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
-            '<button class="vm-btn vm-btn-primary vm-btn-sm" id="trGenBtn" onclick="trGenItems()">✨ Sinh câu</button>'+
-            '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="trRegenBtn" style="display:none" onclick="trGenItems()">↺ Thử lại</button>'+
-          '</div>'+
-          '<div id="trGenStatus" style="font-size:.8rem;color:var(--vm-ink-3);margin-top:8px;min-height:16px"></div>'+
-        '</div>'+
-
-        '<div id="trPreviewWrap" style="display:none">'+
-          '<div style="font-size:.78rem;font-weight:700;color:var(--vm-ink-2);margin-bottom:8px">📋 Preview 30 câu <span id="trItemCount" style="color:var(--vm-ink-3)"></span></div>'+
-          '<div style="max-height:280px;overflow-y:auto;border:1px solid var(--vm-border-2);border-radius:var(--vm-r-sm)">'+
-            '<table class="vm-table" style="font-size:.78rem"><thead><tr>'+
-              '<th>#</th><th>Chiều</th><th>Câu gốc</th><th>Đáp án mẫu</th><th>Vocab</th>'+
-            '</tr></thead>'+
-            '<tbody id="trItemsTbody"></tbody></table>'+
-          '</div>'+
-        '</div>'+
-
-      '</div>'+
-      '<div class="vm-modal-footer">'+
-        '<button class="vm-btn vm-btn-ghost" onclick="closeTrModal()">Huỷ</button>'+
-        '<button class="vm-btn vm-btn-primary" id="trSaveBtn" disabled onclick="saveTrSet()">💾 Lưu bài dịch</button>'+
-      '</div>'+
-    '</div>';
-  document.body.appendChild(el);
-}
-
 var _trItems = [];
 
 function openTrModal(){
-  injectTranslateModal();
-  document.getElementById('trModal').classList.add('show');
-  _trItems=[];
+  // Use static modal with correct vm-modal-bg pattern
+  _trItems = [];
+  document.getElementById('trSaveBtn').disabled = true;
+  document.getElementById('trPreviewWrap').style.display = 'none';
+  document.getElementById('trGenStatus').textContent = '';
+  var regenBtn = document.getElementById('trRegenBtn');
+  if(regenBtn) regenBtn.style.display = 'none';
+
   // Populate class dropdown
-  var sel=document.getElementById('tr-class');
-  sel.innerHTML='<option value="">— Chọn lớp —</option>'+
+  var sel = document.getElementById('tr-class');
+  sel.innerHTML = '<option value="">— Chọn lớp —</option>'+
     state.classes.map(function(c){ return '<option value="'+VM.esc(c.classId)+'">'+VM.esc(c.className)+'</option>'; }).join('');
   trClassChanged();
-  // Default session start = now + 5 min
-  var d=new Date(Date.now()+5*60000);
-  var off=d.getTimezoneOffset()*60000;
-  document.getElementById('tr-start').value=new Date(d.getTime()-off).toISOString().slice(0,16);
+
+  // Default session start = now + 5 min (local time)
+  var d = new Date(Date.now() + 5*60000);
+  var off = d.getTimezoneOffset() * 60000;
+  document.getElementById('tr-start').value = new Date(d.getTime() - off).toISOString().slice(0,16);
+
+  document.getElementById('translateModal').classList.add('show');
 }
-function closeTrModal(){ var m=document.getElementById('trModal'); if(m) m.classList.remove('show'); }
+
+function closeTrModal(){
+  document.getElementById('translateModal').classList.remove('show');
+}
 
 function trClassChanged(){
   var cls=document.getElementById('tr-class').value;
@@ -1517,11 +1527,12 @@ function trGenItems(){
     '',
     'Return ONLY the JSON array of 30 objects.'
   ].join('\n')
+  var TR_GEN_MODELS=['gemini-3.5-flash','gemini-3.6-flash','gemini-3.5-flash-lite'];
   var mi=0;
 
   function tryModel(){
-    if(mi>=MODELS.length){ onFail('All Gemini models failed'); return; }
-    var m=MODELS[mi++];
+    if(mi>=TR_GEN_MODELS.length){ onFail('All Gemini models failed'); return; }
+    var m=TR_GEN_MODELS[mi++];
     fetch('https://generativelanguage.googleapis.com/v1beta/models/'+m+':generateContent?key='+encodeURIComponent(key),{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],
@@ -1538,7 +1549,7 @@ function trGenItems(){
       if(!Array.isArray(arr)||arr.length<10) throw new Error('Invalid items: '+arr.length);
       onSuccess(arr.slice(0,30));
     }).catch(function(err){
-      if(mi<MODELS.length) tryModel();
+      if(mi<TR_GEN_MODELS.length) tryModel();
       else onFail(err.message||String(err));
     });
   }
