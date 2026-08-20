@@ -377,7 +377,7 @@ function switchTab(id) {
   var content = document.getElementById('vmContent');
   content.innerHTML = '<div class="vm-empty"><span class="vm-spin-dark" style="width:24px;height:24px;border-width:3px"></span></div>';
   // Results tab manages its own loading state — don't show global overlay
-  if (id !== 'results' && id !== 'translate') showOverlay('Loading…');
+  if (id !== 'results' && id !== 'translate' && id !== 'settings') showOverlay('Loading…');
   if (id === 'overview') renderOverview();
   else if (id === 'classes')  renderClasses();
   else if (id === 'assign')   renderAssignments();
@@ -1743,6 +1743,7 @@ function loadTrStats(setId){
 
 // ── Teacher Settings ──────────────────────────────────────────────────
 function renderTeacherSettings(){
+  hideOverlay();
   var c = document.getElementById('vmContent');
 
   var gemKey  = VM.geminiKey.get();
