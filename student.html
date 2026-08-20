@@ -168,6 +168,7 @@ VM.renderShell({
     {id:'inclass', label:'In-class',      icon:'inclass'},
     {id:'reading', label:'ReadWise',      icon:'reading'},
     {id:'history',  label:'History',       icon:'results'},
+    {id:'translate', label:'Dịch',          icon:'reading'},
     {id:'settings', label:'Settings',      icon:'edit'},
   ],
   onNav: switchTab
@@ -176,7 +177,7 @@ VM.renderShell({
 function switchTab(id){
   S.activeTab=id;
   VM.setActiveNav(id);
-  var titles={home:'Home',homework:'Homework',inclass:'In-class Review',reading:'ReadWise',history:'History',settings:'Settings'};
+  var titles={home:'Home',homework:'Homework',inclass:'In-class Review',reading:'ReadWise',translate:'Luyện Dịch',history:'History',settings:'Settings'};
   VM.setTitle(titles[id]||id);
   var c=document.getElementById('vmContent');
   c.innerHTML='<div class="vm-empty" style="padding:40px"><span class="vm-spin-dark" style="width:22px;height:22px;border-width:3px"></span></div>';
@@ -185,6 +186,7 @@ function switchTab(id){
   else if(id==='inclass')  renderAssignList('inclass');
   else if(id==='reading')  renderReadWise();
   else if(id==='settings') renderSettings();
+  else if(id==='translate') renderTranslateList();
   else if(id==='history'){
     // Pre-load assignments so retry buttons work
     if(!S.assignments.length) loadAssignments(function(){ renderHistory(); });
@@ -1728,7 +1730,380 @@ function renderSettings(){
   document.getElementById('stSignOutBtn').onclick=function(){ VM.session.logout(); };
 }
 
-/* ── Boot ─────────────────────────────────────── */
+/* ── Translate (Luyện Dịch) ──────────────────────────────────────── */
+
+var _trSet = null;       // current set data (with items)
+var _trProgress = null;  // {clearedItemIds, runs, bestScore, nextRunIndex}
+var _trBatch = [];       // current 7-item batch
+var _trBatchResults = [];// scored items this run
+var _trBatchIdx = 0;     // which item in batch we're on
+
+function renderTranslateList(){
+  var c = document.getElementById('vmContent');
+  showOverlay('Đang tải…');
+  VM.api('translate.forStudent', { classId: sess.class || '' }).then(function(res){
+    hideOverlay();
+    var sets = (res && res.success) ? res.data : [];
+    if(!sets.length){
+      c.innerHTML='<div class="vm-empty"><p>Chưa có bài luyện dịch. Giáo viên sẽ tạo từ Homework.</p></div>';
+      return;
+    }
+    c.innerHTML = '<div class="vm-assign-grid">'+sets.map(function(s){
+      var st = s.sessionStatus;
+      var badge='', badgeColor='', btnLabel='Bắt đầu', btnDis=false;
+      if(st==='upcoming'){ badge='⏳ Chưa mở'; badgeColor='#A66B00'; btnDis=true; btnLabel='Chưa mở'; }
+      else if(st==='closed'){ badge='✓ Đã đóng'; badgeColor='var(--vm-ink-3)'; btnDis=true; btnLabel='Đã đóng'; }
+      else { badge='🟢 Đang mở'; badgeColor='var(--vm-ok)'; }
+      return '<div class="vm-assign-card" data-tr-start="'+VM.esc(s.setId)+'">'+
+        '<div class="vm-assign-card-title">'+VM.esc(s.title)+'</div>'+
+        '<div style="font-size:.75rem;font-weight:700;color:'+badgeColor+';margin-bottom:4px">'+badge+'</div>'+
+        '<div class="vm-assign-meta">'+
+          '<span>🎯 Pass: '+s.passScore+'%</span>'+
+          '<span>📅 '+fmtTrTime(s.sessionStart)+'</span>'+
+        '</div>'+
+        '<div style="font-size:.75rem;color:var(--vm-ink-3);margin-bottom:6px">Tiến độ: --/30 câu</div>'+
+        '<button class="vm-btn vm-btn-primary vm-btn-block" style="padding:10px;font-size:.88rem;margin-top:6px" '+
+          (btnDis?'disabled style="opacity:.5;cursor:not-allowed"':'')+'>'+btnLabel+' →</button>'+
+      '</div>';
+    }).join('')+'</div>';
+
+    VM.els('[data-tr-start]').forEach(function(card){
+      card.onclick = function(e){
+        if(e.target.tagName==='BUTTON'&&e.target.disabled) return;
+        var sid = card.getAttribute('data-tr-start');
+        var s = sets.find(function(x){ return x.setId===sid; });
+        if(!s) return;
+        if(s.sessionStatus==='upcoming'){ VM.toast('Chưa đến giờ làm bài.','warn'); return; }
+        if(s.sessionStatus==='closed'){   VM.toast('Bài đã đóng.','warn'); return; }
+        openTrSet(sid, s);
+      };
+    });
+  }).catch(function(){ hideOverlay(); VM.toast('Connection error.','err'); });
+}
+
+function fmtTrTime(str){
+  if(!str) return '—';
+  var d = new Date(str);
+  if(isNaN(d)) return str;
+  return d.toLocaleString('vi-VN',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false});
+}
+
+function openTrSet(setId, preview){
+  showOverlay('Đang tải bài…');
+  VM.api('translate.get',{setId:setId}).then(function(r1){
+    VM.api('translate.myProgress',{setId:setId,studentId:sess.studentId}).then(function(r2){
+      hideOverlay();
+      _trSet = r1.data;
+      _trProgress = r2.success ? r2.data : {runs:0,clearedItemIds:[],bestScore:0,nextRunIndex:1};
+
+      // Show rules/intro screen
+      renderTrIntro();
+    }).catch(function(){ hideOverlay(); VM.toast('Error.','err'); });
+  }).catch(function(){ hideOverlay(); VM.toast('Error loading set.','err'); });
+}
+
+function renderTrIntro(){
+  var c=document.getElementById('vmContent');
+  VM.setTitle(_trSet.title);
+  var cleared = _trProgress.clearedItemIds.length;
+  var total   = (_trSet.items||[]).length;
+  var pct     = total?Math.round(cleared/total*100):0;
+  c.innerHTML=
+    '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="trBack" style="margin-bottom:12px">← Về danh sách</button>'+
+    '<div class="vm-card" style="padding:24px 26px;max-width:500px;margin:0 auto">'+
+      '<h3 style="font-family:var(--vm-font-display);font-size:1.1rem;margin:0 0 12px">📖 Luật chơi</h3>'+
+      '<ul style="font-size:.88rem;color:var(--vm-ink-2);line-height:1.75;padding-left:18px;margin:0 0 16px">'+
+        '<li>Mỗi lượt dịch <b>7 câu</b> xen kẽ EN↔VI</li>'+
+        '<li>Đạt ≥ <b>'+_trSet.passScore+'%</b> mới mở lượt tiếp</li>'+
+        '<li>AI chấm điểm theo ý nghĩa (không cần dịch y chang)</li>'+
+        '<li>Câu 💎 là "báu vật" — học kỹ pattern!</li>'+
+        '<li>Tiến độ: <b>'+cleared+'/'+total+'</b> câu đã đạt</li>'+
+      '</ul>'+
+      '<div class="vm-assign-pbar" style="margin-bottom:16px">'+
+        '<div class="vm-assign-pfill'+(cleared>=total?' done':'').trim()+'" style="width:'+pct+'%"></div>'+
+      '</div>'+
+      (cleared>=total?
+        '<div style="color:var(--vm-ok);font-weight:700;margin-bottom:12px">🎉 Bạn đã hoàn thành tất cả 30 câu!</div>':'') +
+      '<div style="display:flex;gap:10px;flex-wrap:wrap">'+
+        '<button class="vm-btn vm-btn-primary" id="trStartRun" style="padding:11px 24px">'+
+          (cleared>=total?'Làm lại từ đầu':'Bắt đầu lượt '+ (_trProgress.nextRunIndex||1))+
+        '</button>'+
+      '</div>'+
+    '</div>';
+
+  document.getElementById('trBack').onclick=function(){ renderTranslateList(); };
+  document.getElementById('trStartRun').onclick=function(){ startTrRun(); };
+}
+
+function pickTrBatch(items, clearedIds, n){
+  var clearedSet = {};
+  clearedIds.forEach(function(id){ clearedSet[id]=true; });
+  var pending = items.filter(function(it){ return !clearedSet[it.id]; });
+  // Shuffle pending
+  for(var i=pending.length-1;i>0;i--){
+    var j=Math.floor(Math.random()*(i+1)); var t=pending[i]; pending[i]=pending[j]; pending[j]=t;
+  }
+  var batch = pending.slice(0,n);
+  // If not enough pending, fill from all (shuffled)
+  if(batch.length < n){
+    var rest = items.filter(function(it){ return !pending.some(function(p){ return p.id===it.id; }); });
+    for(var k=rest.length-1;k>0;k--){
+      var l=Math.floor(Math.random()*(k+1)); var u=rest[k]; rest[k]=rest[l]; rest[l]=u;
+    }
+    batch = batch.concat(rest.slice(0, n-batch.length));
+  }
+  return batch;
+}
+
+function startTrRun(){
+  _trBatch = pickTrBatch(_trSet.items||[], _trProgress.clearedItemIds||[], 7);
+  _trBatchResults = [];
+  _trBatchIdx = 0;
+  renderTrQuestion();
+}
+
+function renderTrQuestion(){
+  var c=document.getElementById('vmContent');
+  var q=_trBatch[_trBatchIdx];
+  if(!q){ renderTrRunResult(); return; }
+  var total=_trBatch.length;
+  var dirLabel = q.direction==='en2vi'?'Dịch sang Tiếng Việt':'Dịch sang Tiếng Anh';
+  var dirBadge = q.direction==='en2vi'?'EN → VI':'VI → EN';
+  var dirColor = q.direction==='en2vi'?'var(--vm-primary)':'#8B5CF6';
+
+  c.innerHTML=
+    '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="trQBack" style="margin-bottom:10px">← Về danh sách</button>'+
+    '<div class="vm-quiz-wrap">'+
+      '<div class="vm-quiz-header" style="margin-bottom:12px">'+
+        '<div style="display:flex;align-items:center;gap:8px">'+
+          '<span style="font-size:.8rem;font-weight:700;color:'+dirColor+'">'+dirBadge+'</span>'+
+          '<span style="font-size:.8rem;color:var(--vm-ink-3)">· Câu '+(_trBatchIdx+1)+'/'+total+'</span>'+
+          (q.isTreasure?'<span style="font-size:.8rem">💎</span>':'')+
+        '</div>'+
+        '<span style="font-size:.78rem;color:var(--vm-ink-3)">Lượt '+(_trProgress.nextRunIndex||1)+'</span>'+
+      '</div>'+
+      '<div class="vm-quiz-card">'+
+        '<div class="vm-quiz-prompt-box" style="font-size:1.2rem">'+VM.esc(q.source)+'</div>'+
+        '<p style="font-size:.8rem;color:var(--vm-ink-3);text-align:center;margin-bottom:10px">'+dirLabel+'</p>'+
+        '<textarea class="vm-input" id="trAnswer" rows="3" '+
+          'placeholder="Nhập bản dịch của bạn…" '+
+          'style="resize:vertical;font-size:.95rem;line-height:1.6" autocomplete="off"></textarea>'+
+        '<div id="trGradeStatus" style="font-size:.8rem;color:var(--vm-ink-3);min-height:16px;margin-top:6px"></div>'+
+        '<div style="display:flex;gap:10px;margin-top:12px">'+
+          '<button class="vm-btn vm-btn-primary" id="trSubmitBtn" style="flex:1;padding:11px">Nộp câu này</button>'+
+        '</div>'+
+        '<div id="trFeedbackWrap" style="display:none;margin-top:14px;padding:14px 16px;background:var(--vm-surface-2);border-radius:var(--vm-r-sm);border:1px solid var(--vm-border-2)">'+
+          '<div id="trFeedbackContent"></div>'+
+          '<div id="trChestBtn" style="margin-top:10px;display:none">'+
+            '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="addChestBtn">💎 Lưu vào rương</button>'+
+          '</div>'+
+          '<button class="vm-btn vm-btn-primary" id="trNextBtn" style="margin-top:12px;width:100%;padding:10px">'+
+            (_trBatchIdx+1<total?'Câu tiếp →':'Xem kết quả lượt này')+
+          '</button>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+
+  document.getElementById('trQBack').onclick=function(){ renderTranslateList(); };
+  var submitBtn=document.getElementById('trSubmitBtn');
+  var answerEl=document.getElementById('trAnswer');
+  var statusEl=document.getElementById('trGradeStatus');
+
+  submitBtn.onclick=function(){
+    var answer=(answerEl.value||'').trim();
+    if(!answer){ VM.toast('Nhập bản dịch trước.','warn'); return; }
+    submitBtn.disabled=true;
+    statusEl.innerHTML='<span class="vm-spin-dark" style="width:12px;height:12px;border-width:2px;display:inline-block;vertical-align:middle;margin-right:5px"></span> AI đang chấm…';
+    gradeTrItem(q, answer, function(result){
+      statusEl.textContent='';
+      _trBatchResults.push({
+        itemId:q.id, direction:q.direction,
+        studentAnswer:answer, score:result.score, feedback:result.feedback
+      });
+      showTrFeedback(q, answer, result);
+    });
+  };
+  answerEl.onkeydown=function(e){
+    if(e.key==='Enter'&&e.ctrlKey){ e.preventDefault(); submitBtn.click(); }
+  };
+}
+
+function gradeTrItem(item, answer, cb){
+  var key = VM.geminiKey.get();
+  var groq = VM.groqKey.get();
+  if(!key && !groq){ cb(offlineTrGrade(item,answer)); return; }
+
+  var prompt=[
+    'You are an EFL translation grader. Grade this translation STRICTLY by semantic meaning.',
+    'Direction: '+(item.direction==='en2vi'?'English → Vietnamese':'Vietnamese → English'),
+    'Source: '+item.source,
+    'Model answer: '+item.modelAnswer,
+    'Student answer: '+answer,
+    (item.targetWords&&item.targetWords.length?'Target words to use: '+item.targetWords.join(', '):''),
+    '',
+    'Return ONLY JSON (no markdown):',
+    '{"score":0-100,"feedback":"1-2 sentences in the same language the student used","usedTargets":[],"missedTargets":[]}',
+    'Score 90-100: correct meaning, natural expression.',
+    'Score 70-89: mostly correct with minor issues.',
+    'Score 50-69: partial credit, key meaning present but errors.',
+    'Score <50: wrong meaning or too incomplete.',
+    'NEVER reveal other questions or answers.'
+  ].join('\n')
+  var MODELS=['gemini-3.5-flash','gemini-3.6-flash'];
+  var mi=0;
+
+  function tryGemini(){
+    if(mi>=MODELS.length){ if(groq) tryGroq(); else cb(offlineTrGrade(item,answer)); return; }
+    var m=MODELS[mi++];
+    fetch('https://generativelanguage.googleapis.com/v1beta/models/'+m+':generateContent?key='+encodeURIComponent(key),{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],
+        generationConfig:{maxOutputTokens:256,temperature:0.2}})
+    }).then(function(r){ return r.json(); }).then(function(d){
+      var parts=(((d.candidates||[])[0]||{}).content||{}).parts||[];
+      var text=parts.map(function(p){return p.text||'';}).join('').trim()
+        .replace(/```json[\n]?/g,'').replace(/```[\n]?/g,'').trim();
+      var parsed=JSON.parse(text);
+      cb({score:parsed.score||0,feedback:parsed.feedback||'',usedTargets:parsed.usedTargets||[],missedTargets:parsed.missedTargets||[]});
+    }).catch(function(){ tryGemini(); });
+  }
+
+  function tryGroq(){
+    fetch('https://api.groq.com/openai/v1/chat/completions',{
+      method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+groq},
+      body:JSON.stringify({model:'llama3-70b-8192',messages:[{role:'user',content:prompt}],
+        temperature:0.2,max_tokens:256})
+    }).then(function(r){ return r.json(); }).then(function(d){
+      var text=((d.choices||[])[0]||{}).message&&d.choices[0].message.content||'';
+      text=text.replace(/```json[\n]?/g,'').replace(/```[\n]?/g,'').trim();
+      var parsed=JSON.parse(text);
+      cb({score:parsed.score||0,feedback:parsed.feedback||'',usedTargets:parsed.usedTargets||[],missedTargets:parsed.missedTargets||[]});
+    }).catch(function(){ cb(offlineTrGrade(item,answer)); });
+  }
+
+  if(key) tryGemini(); else tryGroq();
+}
+
+function offlineTrGrade(item, answer){
+  // Fallback: token overlap scoring
+  function tokens(s){ return s.toLowerCase().replace(/[^\w\s]/g,'').split(/\s+/).filter(Boolean); }
+  var ref=tokens(item.modelAnswer), ans=tokens(answer);
+  var matches=ans.filter(function(t){ return ref.indexOf(t)>=0; }).length;
+  var score = ref.length ? Math.round(Math.min(100, matches/ref.length*100)) : 0;
+  return { score:score, feedback:'(Chấm offline — không có AI key)', usedTargets:[], missedTargets:[] };
+}
+
+function showTrFeedback(item, answer, result){
+  var sc=result.score;
+  var col=sc>=85?'var(--vm-ok)':(sc>=60?'#A66B00':'var(--vm-danger)');
+  var fbWrap=document.getElementById('trFeedbackWrap');
+  var fbContent=document.getElementById('trFeedbackContent');
+  fbContent.innerHTML=
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'+
+      '<div style="font-family:var(--vm-font-display);font-size:1.5rem;font-weight:700;color:'+col+'">'+sc+'%</div>'+
+      '<div style="font-size:.85rem;color:var(--vm-ink-2)">'+VM.esc(result.feedback)+'</div>'+
+    '</div>'+
+    '<div style="font-size:.8rem;background:var(--vm-surface);border-radius:6px;padding:8px 12px;border-left:3px solid var(--vm-ok)">'+
+      '<b style="font-size:.72rem;color:var(--vm-ink-3);display:block;margin-bottom:3px">ĐÁP ÁN MẪU</b>'+
+      VM.esc(item.modelAnswer)+
+    '</div>'+
+    (item.pattern?'<div style="font-size:.78rem;color:#8B5CF6;margin-top:8px">💡 Pattern: <b>'+VM.esc(item.pattern)+'</b></div>':'')+
+    (result.missedTargets&&result.missedTargets.length?
+      '<div style="font-size:.76rem;color:var(--vm-danger);margin-top:6px">Từ chưa dùng: '+VM.esc(result.missedTargets.join(', '))+'</div>':'');
+
+  fbWrap.style.display='';
+  // Treasure chest
+  if(item.isTreasure){
+    document.getElementById('trChestBtn').style.display='';
+    document.getElementById('addChestBtn').onclick=function(){
+      VM.toast('💎 Đã lưu vào rương!','ok');
+      _trBatch[_trBatchIdx]._savedToChest=true;
+      this.disabled=true; this.textContent='✓ Đã lưu';
+    };
+  }
+  // Next button
+  document.getElementById('trNextBtn').onclick=function(){
+    _trBatchIdx++;
+    if(_trBatchIdx>=_trBatch.length) renderTrRunResult();
+    else renderTrQuestion();
+  };
+  document.getElementById('trSubmitBtn').style.display='none';
+}
+
+function renderTrRunResult(){
+  var c=document.getElementById('vmContent');
+  // Calculate scores
+  var total=_trBatchResults.length||1;
+  var runScore=Math.round(_trBatchResults.reduce(function(a,r){ return a+(r.score||0); },0)/total);
+  var passed=runScore>=(_trSet.passScore||85);
+
+  // Build cleared IDs (cumulative)
+  var prevCleared={};
+  (_trProgress.clearedItemIds||[]).forEach(function(id){ prevCleared[id]=true; });
+  _trBatchResults.forEach(function(r){ if((r.score||0)>=(_trSet.passScore||85)) prevCleared[r.itemId]=true; });
+  var newClearedIds=Object.keys(prevCleared);
+
+  // Chest items
+  var chest=_trBatch.filter(function(it){ return it._savedToChest; }).map(function(it){
+    return {itemId:it.id,source:it.source,modelAnswer:it.modelAnswer,pattern:it.pattern||null};
+  });
+
+  // Save result
+  var runIdx=_trProgress.nextRunIndex||1;
+  VM.api('translate.saveResult',{
+    studentId:sess.studentId, name:sess.name||'', class:sess.class||'',
+    setId:_trSet.setId, title:_trSet.title,
+    runIndex:runIdx, score:runScore, passed:passed,
+    durationSec:0,
+    itemScores:_trBatchResults,
+    clearedItemIds:newClearedIds,
+    chest:chest
+  }).then(function(r){
+    if(r&&r.success){
+      _trProgress.clearedItemIds=newClearedIds;
+      _trProgress.nextRunIndex=(runIdx+1);
+      _trProgress.runs=(_trProgress.runs||0)+1;
+    }
+  });
+
+  var cleared=newClearedIds.length, total30=(_trSet.items||[]).length;
+  var pct=total30?Math.round(cleared/total30*100):0;
+  var scCol=runScore>=85?'var(--vm-ok)':(runScore>=60?'#A66B00':'var(--vm-danger)');
+
+  c.innerHTML=
+    '<div class="vm-result-banner" style="margin-top:8px">'+
+      '<div class="vm-result-score" style="color:'+scCol+'">'+runScore+'%</div>'+
+      '<div class="vm-result-label">'+(passed?'✅ Đạt lượt này!':'❌ Chưa đạt lượt này')+
+        ' · '+cleared+'/'+total30+' câu đã clear</div>'+
+      '<div class="vm-assign-pbar" style="max-width:320px;margin:12px auto">'+
+        '<div class="vm-assign-pfill'+(cleared>=total30?' done':'').trim()+'" style="width:'+pct+'%"></div></div>'+
+      (passed&&cleared<total30?
+        '<div style="font-size:.85rem;color:var(--vm-ink-2);margin-bottom:16px">'+
+          'Còn '+(total30-cleared)+' câu nữa. Hãy làm lượt tiếp!</div>':'') +
+      (passed&&cleared>=total30?
+        '<div style="font-size:.9rem;color:var(--vm-ok);font-weight:700;margin-bottom:16px">🎉 Bạn đã hoàn thành tất cả câu!</div>':'') +
+      (!passed?'<div style="font-size:.85rem;color:var(--vm-ink-3);margin-bottom:16px">Làm lại lượt hiện tại để tăng điểm.</div>':'') +
+      '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">'+
+        (passed&&cleared<total30?
+          '<button class="vm-btn vm-btn-primary" id="trContinue" style="padding:11px 24px">Làm tiếp 7 câu →</button>':'') +
+        (!passed?
+          '<button class="vm-btn vm-btn-primary" id="trRetry" style="padding:11px 24px">Làm lại lượt này</button>':'') +
+        '<button class="vm-btn vm-btn-ghost" id="trBackList" style="padding:11px 20px">← Về danh sách</button>'+
+      '</div>'+
+    '</div>';
+
+  var cb=document.getElementById('trContinue');
+  if(cb) cb.onclick=function(){ startTrRun(); };
+  var rb=document.getElementById('trRetry');
+  if(rb) rb.onclick=function(){
+    // Redo same batch (not advancing cleared)
+    _trBatchResults=[];_trBatchIdx=0;
+    renderTrQuestion();
+  };
+  document.getElementById('trBackList').onclick=function(){ renderTranslateList(); };
+}
+
+
 // Init AI chat — student mode, auto-cascade Gemini→Groq, no answer spoiling
 VM.Chat.init({ role:'student', context:'' });
 
