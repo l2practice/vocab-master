@@ -300,12 +300,21 @@ function hideOverlay(){ document.getElementById('globalOverlay').classList.remov
   function fmtDeadline(val) {
     if (!val || val === '∞' || val === '') return '∞';
     var s = String(val).trim();
-    // Date only (YYYY-MM-DD) — show as DD/MM/YYYY, no timezone conversion needed
+    // Date only (YYYY-MM-DD)
     if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
       var parts = s.split('-');
       return parts[2] + '/' + parts[1] + '/' + parts[0];
     }
-    // ISO datetime — convert to UTC+7
+    // datetime-local strings (e.g. "2026-08-20T14:00") have NO timezone suffix
+    // → already local time (VN +7), parse as-is directly from string
+    var hasTimezone = /Z$|[+-]\d{2}:\d{2}$/.test(s);
+    if (!hasTimezone) {
+      // Parse date/time parts directly — no conversion
+      var m = s.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+      if (m) return m[3]+'/'+m[2]+'/'+m[1]+' '+m[4]+':'+m[5];
+      return s;
+    }
+    // Explicit UTC (has Z or offset) — convert to +7
     var d = new Date(s);
     if (isNaN(d.getTime())) return s;
     var vn = new Date(d.getTime() + 7 * 3600000);

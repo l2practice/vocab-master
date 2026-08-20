@@ -1908,7 +1908,7 @@ function renderTrQuestion(){
             '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="addChestBtn">💎 Lưu vào rương</button>'+
           '</div>'+
           '<button class="vm-btn vm-btn-primary" id="trNextBtn" style="margin-top:12px;width:100%;padding:10px">'+
-            (_trBatchIdx+1<total?'Câu tiếp →':'Xem kết quả lượt này')+
+            'Câu tiếp →'+
           '</button>'+
         '</div>'+
       '</div>'+
@@ -2005,13 +2005,20 @@ function offlineTrGrade(item, answer){
 
 function showTrFeedback(item, answer, result){
   var sc=result.score;
-  var col=sc>=85?'var(--vm-ok)':(sc>=60?'#A66B00':'var(--vm-danger)');
+  var passScore2 = (_trSet && _trSet.passScore) || 85;
+  var col=sc>=passScore2?'var(--vm-ok)':(sc>=60?'#A66B00':'var(--vm-danger)');
+  var passedThis = sc >= passScore2;
   var fbWrap=document.getElementById('trFeedbackWrap');
   var fbContent=document.getElementById('trFeedbackContent');
   fbContent.innerHTML=
     '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'+
       '<div style="font-family:var(--vm-font-display);font-size:1.5rem;font-weight:700;color:'+col+'">'+sc+'%</div>'+
-      '<div style="font-size:.85rem;color:var(--vm-ink-2)">'+VM.esc(result.feedback)+'</div>'+
+      '<div style="flex:1">'+
+        '<div style="font-size:.78rem;font-weight:700;color:'+col+';margin-bottom:3px">'+
+          (passedThis?'✅ Đạt — qua câu tiếp':'❌ Chưa đạt — cần dịch lại')+
+        '</div>'+
+        '<div style="font-size:.82rem;color:var(--vm-ink-2)">'+VM.esc(result.feedback)+'</div>'+
+      '</div>'+
     '</div>'+
     '<div style="font-size:.8rem;background:var(--vm-surface);border-radius:6px;padding:8px 12px;border-left:3px solid var(--vm-ok)">'+
       '<b style="font-size:.72rem;color:var(--vm-ink-3);display:block;margin-bottom:3px">ĐÁP ÁN MẪU</b>'+
@@ -2031,12 +2038,34 @@ function showTrFeedback(item, answer, result){
       this.disabled=true; this.textContent='✓ Đã lưu';
     };
   }
-  // Next button
-  document.getElementById('trNextBtn').onclick=function(){
-    _trBatchIdx++;
-    if(_trBatchIdx>=_trBatch.length) renderTrRunResult();
-    else renderTrQuestion();
-  };
+  // Next button — only advance if score >= passScore
+  var passScore = (_trSet && _trSet.passScore) || 85;
+  var passed = result.score >= passScore;
+  var nextBtn = document.getElementById('trNextBtn');
+  if(!passed){
+    // Score too low — show retry option instead of advancing
+    nextBtn.textContent = '🔄 Dịch lại câu này';
+    nextBtn.style.background = 'var(--vm-danger)';
+    nextBtn.onclick = function(){
+      // Remove this item's result (will re-grade)
+      _trBatchResults = _trBatchResults.filter(function(r){ return r.itemId !== item.id; });
+      // Re-render same question
+      var fbWrap2 = document.getElementById('trFeedbackWrap');
+      if(fbWrap2) fbWrap2.style.display='none';
+      var submitBtn2 = document.getElementById('trSubmitBtn');
+      if(submitBtn2){ submitBtn2.style.display=''; submitBtn2.disabled=false; }
+      var ans2 = document.getElementById('trAnswer');
+      if(ans2){ ans2.disabled=false; ans2.value=''; ans2.focus(); }
+      var status2 = document.getElementById('trGradeStatus');
+      if(status2) status2.textContent='';
+    };
+  } else {
+    nextBtn.onclick = function(){
+      _trBatchIdx++;
+      if(_trBatchIdx>=_trBatch.length) renderTrRunResult();
+      else renderTrQuestion();
+    };
+  }
   document.getElementById('trSubmitBtn').style.display='none';
 }
 
