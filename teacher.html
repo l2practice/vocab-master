@@ -274,6 +274,7 @@ function navItems() {
     { id:'hwbook',    label:'HW Book',      icon:'hw'       },
     { id:'translate', label:'Dịch',         icon:'reading'  },
     { id:'results',   label:'Results',      icon:'results'  },
+    { id:'settings',  label:'Settings',     icon:'edit'     },
   ];
 }
 
@@ -287,17 +288,18 @@ VM.renderShell({
 function switchTab(id) {
   state.activeTab = id;
   VM.setActiveNav(id);
-  var titles = { overview:'Overview', classes:'Classes', assign:'Assignments', hwbook:'HW Book', translate:'Luyện Dịch', results:'Results' };
+  var titles = { overview:'Overview', classes:'Classes', assign:'Assignments', hwbook:'HW Book', translate:'Luyện Dịch', results:'Results', settings:'Settings' };
   VM.setTitle(titles[id] || id);
   var content = document.getElementById('vmContent');
   content.innerHTML = '<div class="vm-empty"><span class="vm-spin-dark" style="width:24px;height:24px;border-width:3px"></span></div>';
   // Results tab manages its own loading state — don't show global overlay
-  if (id !== 'results') showOverlay('Loading…');
+  if (id !== 'results' && id !== 'translate') showOverlay('Loading…');
   if (id === 'overview') renderOverview();
   else if (id === 'classes')  renderClasses();
   else if (id === 'assign')   renderAssignments();
   else if (id === 'hwbook')   renderHWBook();
   else if (id === 'translate') renderTranslate();
+  else if (id === 'settings')  renderTeacherSettings();
   else if (id === 'results')  renderResults();
 }
 
@@ -1611,13 +1613,11 @@ function saveTrSet(){
 
 /* ── Translate list + stats ── */
 function renderTranslate(){
-  hideOverlay();
   var c=document.getElementById('vmContent');
-  showOverlay('Loading…');
+  c.innerHTML='<div class="vm-empty"><span class="vm-spin-dark" style="width:24px;height:24px;border-width:3px"></span></div>';
   loadClasses(function(){
     loadAssignments(function(){
       VM.api('translate.list',{}).then(function(res){
-        hideOverlay();
         var sets=(res&&res.success)?res.data:[];
         c.innerHTML=
           '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">'+
@@ -1702,6 +1702,132 @@ function loadTrStats(setId){
           }).join('')+'</tbody></table>':'<div style="color:var(--vm-ink-3);font-size:.8rem">Chưa có sinh viên làm.</div>')+
       '</div>';
   });
+}
+
+// ── Teacher Settings ──────────────────────────────────────────────────
+function renderTeacherSettings(){
+  var c = document.getElementById('vmContent');
+
+  var gemKey  = VM.geminiKey.get();
+  var groqKey = VM.groqKey.get();
+
+  c.innerHTML =
+
+    // ── Profile (read-only) ──
+    '<div class="vm-card" style="padding:22px 24px;margin-bottom:16px">'+
+      '<h3 style="font-family:var(--vm-font-display);font-size:1rem;font-weight:700;margin:0 0 14px">👤 Profile</h3>'+
+      '<div style="display:grid;grid-template-columns:auto 1fr;gap:5px 14px;font-size:.88rem;color:var(--vm-ink-2)">'+
+        '<b>Name</b><span>'+VM.esc(sess.name||'—')+'</span>'+
+        '<b>Email</b><span>'+VM.esc(sess.email||'—')+'</span>'+
+      '</div>'+
+    '</div>'+
+
+    // ── Change Password ──
+    '<div class="vm-card" style="padding:22px 24px;margin-bottom:16px">'+
+      '<h3 style="font-family:var(--vm-font-display);font-size:1rem;font-weight:700;margin:0 0 14px">🔐 Change Password</h3>'+
+      '<div class="vm-field"><label class="vm-label">Current Password</label>'+
+        '<input class="vm-input" id="tsPwOld" type="password" placeholder="••••••••"></div>'+
+      '<div class="vm-field"><label class="vm-label">New Password</label>'+
+        '<input class="vm-input" id="tsPwNew" type="password" placeholder="Min 6 characters"></div>'+
+      '<div class="vm-field"><label class="vm-label">Confirm New Password</label>'+
+        '<input class="vm-input" id="tsPwConf" type="password" placeholder="Repeat new password"></div>'+
+      '<div id="tsPwMsg" style="font-size:.8rem;min-height:18px;margin-bottom:10px"></div>'+
+      '<button class="vm-btn vm-btn-primary" id="tsPwBtn" style="padding:10px 22px">Save Password</button>'+
+    '</div>'+
+
+    // ── API Keys ──
+    '<div class="vm-card" style="padding:22px 24px;margin-bottom:16px">'+
+      '<h3 style="font-family:var(--vm-font-display);font-size:1rem;font-weight:700;margin:0 0 4px">🔑 AI API Keys</h3>'+
+      '<p style="font-size:.78rem;color:var(--vm-ink-3);margin:0 0 16px">Keys are saved locally on this device — never sent to any server.</p>'+
+
+      // Gemini
+      '<div class="vm-field">'+
+        '<label class="vm-label" style="display:flex;align-items:center;justify-content:space-between">'+
+          '<span>Gemini API Key <span style="font-size:.7rem;font-weight:400;color:var(--vm-ink-3)">(Google AI Studio — free)</span></span>'+
+          '<a href="https://aistudio.google.com/apikey" target="_blank" style="font-size:.75rem;color:var(--vm-primary);font-weight:600">Get key →</a>'+
+        '</label>'+
+        '<div style="display:flex;gap:8px">'+
+          '<input class="vm-input" id="tsGemKey" type="password" placeholder="AIza…" value="'+VM.esc(gemKey)+'" style="flex:1;font-family:monospace">'+
+          '<button class="vm-btn vm-btn-primary" id="tsGemSave" style="padding:10px 16px;white-space:nowrap">Save</button>'+
+          (gemKey?'<button class="vm-btn vm-btn-ghost" id="tsGemClear" style="padding:10px 12px;color:var(--vm-danger)">✕</button>':'')+
+        '</div>'+
+        '<div id="tsGemStatus" style="font-size:.75rem;margin-top:5px">'+
+          (gemKey?'<span style="color:var(--vm-ok)">✓ Key saved — AI vocab generation & chat active</span>':
+                  '<span style="color:var(--vm-danger)">⚠️ No Gemini key — AI sinh câu dịch sẽ không hoạt động</span>')+
+        '</div>'+
+      '</div>'+
+
+      // Groq
+      '<div class="vm-field" style="margin-top:4px">'+
+        '<label class="vm-label" style="display:flex;align-items:center;justify-content:space-between">'+
+          '<span>Groq API Key <span style="font-size:.7rem;font-weight:400;color:var(--vm-ink-3)">(free)</span></span>'+
+          '<a href="https://console.groq.com/keys" target="_blank" style="font-size:.75rem;color:var(--vm-primary);font-weight:600">Get key →</a>'+
+        '</label>'+
+        '<div style="display:flex;gap:8px">'+
+          '<input class="vm-input" id="tsGroqKey" type="password" placeholder="gsk_…" value="'+VM.esc(groqKey)+'" style="flex:1;font-family:monospace">'+
+          '<button class="vm-btn vm-btn-primary" id="tsGroqSave" style="padding:10px 16px;white-space:nowrap">Save</button>'+
+          (groqKey?'<button class="vm-btn vm-btn-ghost" id="tsGroqClear" style="padding:10px 12px;color:var(--vm-danger)">✕</button>':'')+
+        '</div>'+
+        '<div id="tsGroqStatus" style="font-size:.75rem;margin-top:5px">'+
+          (groqKey?'<span style="color:var(--vm-ok)">✓ Groq key saved (fallback active)</span>':
+                   '<span style="color:var(--vm-ink-3)">No key</span>')+
+        '</div>'+
+      '</div>'+
+    '</div>';
+
+  // Change password
+  document.getElementById('tsPwBtn').onclick = function(){
+    var old2=document.getElementById('tsPwOld').value;
+    var nw=document.getElementById('tsPwNew').value;
+    var cf=document.getElementById('tsPwConf').value;
+    var msg=document.getElementById('tsPwMsg');
+    if(!old2||!nw||!cf){ msg.style.color='var(--vm-danger)'; msg.textContent='Fill in all fields.'; return; }
+    if(nw.length<6){ msg.style.color='var(--vm-danger)'; msg.textContent='New password ≥ 6 characters.'; return; }
+    if(nw!==cf){ msg.style.color='var(--vm-danger)'; msg.textContent='Passwords do not match.'; return; }
+    var btn=document.getElementById('tsPwBtn');
+    btn.disabled=true; btn.textContent='Saving…';
+    VM.api('auth.changePasswordTeacher',{email:sess.email,oldPass:old2,newPass:nw}).then(function(res){
+      btn.disabled=false; btn.textContent='Save Password';
+      if(res&&res.success){
+        msg.style.color='var(--vm-ok)'; msg.textContent='✓ Password changed.';
+        ['tsPwOld','tsPwNew','tsPwConf'].forEach(function(id){ document.getElementById(id).value=''; });
+      } else { msg.style.color='var(--vm-danger)'; msg.textContent=(res&&res.error)||'Error.'; }
+    }).catch(function(){ btn.disabled=false; btn.textContent='Save Password'; msg.style.color='var(--vm-danger)'; msg.textContent='Connection error.'; });
+  };
+
+  // Gemini key
+  document.getElementById('tsGemSave').onclick = function(){
+    var k=(document.getElementById('tsGemKey').value||'').trim();
+    VM.geminiKey.set(k);
+    document.getElementById('tsGemStatus').innerHTML=k?
+      '<span style="color:var(--vm-ok)">✓ Gemini key saved</span>':
+      '<span style="color:var(--vm-danger)">⚠️ No key — AI features unavailable</span>';
+    VM.toast(k?'Gemini key saved!':'Gemini key cleared.','ok');
+  };
+  var gc=document.getElementById('tsGemClear');
+  if(gc) gc.onclick=function(){
+    document.getElementById('tsGemKey').value='';
+    VM.geminiKey.set('');
+    document.getElementById('tsGemStatus').innerHTML='<span style="color:var(--vm-danger)">⚠️ No key</span>';
+    VM.toast('Gemini key cleared.','ok');
+  };
+
+  // Groq key
+  document.getElementById('tsGroqSave').onclick = function(){
+    var k=(document.getElementById('tsGroqKey').value||'').trim();
+    VM.groqKey.set(k);
+    document.getElementById('tsGroqStatus').innerHTML=k?
+      '<span style="color:var(--vm-ok)">✓ Groq key saved</span>':
+      '<span style="color:var(--vm-ink-3)">No key</span>';
+    VM.toast(k?'Groq key saved!':'Groq key cleared.','ok');
+  };
+  var grc=document.getElementById('tsGroqClear');
+  if(grc) grc.onclick=function(){
+    document.getElementById('tsGroqKey').value='';
+    VM.groqKey.set('');
+    document.getElementById('tsGroqStatus').innerHTML='<span style="color:var(--vm-ink-3)">No key</span>';
+    VM.toast('Groq key cleared.','ok');
+  };
 }
 
 // ── Boot ────────────────────────────────────────────────────────────
