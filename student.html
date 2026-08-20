@@ -294,6 +294,7 @@ function renderCards(items){
     var dl=a.deadline?'⏰ '+VM.esc(a.deadline):'∞ No deadline';
 
     // In-class session info + status badge
+    var icDone = a.mode==='inclass' && att > 0; // already submitted — only 1 attempt allowed
     var icMeta='', btnLabel=att?'Try again →':'Start →', btnDisabled=false;
     if(a.mode==='inclass'){
       var st=a.sessionStatus;
@@ -305,9 +306,10 @@ function renderCards(items){
         st=_n<_s?'upcoming':_n>_e?'closed':'open';
       }
       var badge='', badgeColor='';
-      if(st==='upcoming'){ badge='⏳ Chưa đến giờ'; badgeColor='#A66B00'; btnDisabled=true; btnLabel='Chưa mở'; }
-      else if(st==='closed'){ badge='✓ Đã kết thúc'; badgeColor='var(--vm-ink-3)'; btnDisabled=true; btnLabel=att?'Đã nộp':'Vắng'; }
-      else { badge='🟢 Đang mở'; badgeColor='var(--vm-ok)'; btnLabel=att?'Làm lại →':'Bắt đầu →'; }
+      if(icDone){ badge='✅ Đã nộp'; badgeColor='var(--vm-ok)'; btnDisabled=true; btnLabel='Đã nộp ✓'; }
+      else if(st==='upcoming'){ badge='⏳ Chưa đến giờ'; badgeColor='#A66B00'; btnDisabled=true; btnLabel='Chưa mở'; }
+      else if(st==='closed'){ badge='⏹ Đã kết thúc'; badgeColor='var(--vm-ink-3)'; btnDisabled=true; btnLabel='Vắng'; }
+      else { badge='🟢 Đang mở'; badgeColor='var(--vm-ok)'; btnLabel='Bắt đầu →'; }
 
       var sessionLine='';
       if(a.sessionStart){
@@ -674,8 +676,22 @@ function showResult(){
       '</div>'+
       (goalMet?'<div style="margin-top:14px;color:var(--vm-ok);font-weight:700">🏆 Goal achieved!</div>':
         (asgn.mode==='homework'?'<div style="margin-top:8px;font-size:.82rem;color:var(--vm-ink-3)">Need '+(req-perfects)+' more 100% run(s).</div>':''))+
+      // Missed words for inclass
+      (asgn.mode==='inclass' && missedWords.length?
+        '<div style="background:#FEF3D6;border:1.5px solid #F59E0B;border-radius:10px;padding:14px 16px;margin-bottom:16px;text-align:left">'+
+          '<div style="font-weight:700;font-size:.85rem;color:#7A5000;margin-bottom:8px">'+
+            '⚠️ Từ cần chép phạt ('+missedWords.length+')'+
+          '</div>'+
+          '<div id="missedChips" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px">'+
+            missedWords.map(function(w){
+              return '<span style="background:#fff;border:1px solid #F59E0B;color:#7A5000;border-radius:5px;'+
+                'padding:3px 10px;font-size:.82rem;font-weight:600">'+VM.esc(w)+'</span>';
+            }).join('')+
+          '</div>'+
+          '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="copyMissedBtn" style="font-size:.78rem">📋 Copy all</button>'+
+        '</div>':'')+
       '<div style="display:flex;gap:10px;justify-content:center;margin-top:18px;flex-wrap:wrap">'+
-        '<button class="vm-btn vm-btn-primary" id="tryAgain" style="padding:11px 24px">Try Again</button>'+
+        (asgn.mode!=='inclass'?'<button class="vm-btn vm-btn-primary" id="tryAgain" style="padding:11px 24px">Try Again</button>':'')+
         '<button class="vm-btn vm-btn-ghost" id="backRes" style="padding:11px 20px">← Back</button>'+
       '</div>'+
     '</div>';
@@ -688,17 +704,23 @@ function showResult(){
                  : new Date(asgn.sessionStart).getTime()+(asgn.sessionDurationMin||0)*60000;
        return Date.now() > endT;
      })());
+  // Wire copyMissedBtn for inclass
+  var copyBtn = document.getElementById('copyMissedBtn');
+  if(copyBtn && missedWords.length){
+    copyBtn.onclick=function(){
+      navigator.clipboard && navigator.clipboard.writeText(missedWords.join('\n'))
+        .then(function(){ VM.toast('Đã copy '+missedWords.length+' từ!','ok'); })
+        .catch(function(){ VM.toast('Không copy được — chọn tay nhé.','warn'); });
+    };
+  }
+  // Try Again — inclass never retries (already blocked in renderCards too)
   var tryAgainBtn = document.getElementById('tryAgain');
   if(tryAgainBtn){
-    if(isICClosed){
-      tryAgainBtn.style.display='none';
-    } else {
-      tryAgainBtn.onclick=function(){
-        if(asgn.mode==='readwise' && _currentRWArticle) openRWQuiz(_currentRWArticle);
-        else if(asgn.mode==='readwise') renderReadWise();
-        else startQuiz(asgn);
-      };
-    }
+    tryAgainBtn.onclick=function(){
+      if(asgn.mode==='readwise' && _currentRWArticle) openRWQuiz(_currentRWArticle);
+      else if(asgn.mode==='readwise') renderReadWise();
+      else startQuiz(asgn);
+    };
   }
   document.getElementById('backRes').onclick=function(){
     if(asgn.mode==='readwise' && _currentRWArticle) renderRWReader(_currentRWArticle);
@@ -1465,14 +1487,17 @@ function renderHistory(){
                   (g.mode==='inclass'?'⚠️ Từ cần chép phạt':'Most Missed Words')+
                 '</div>'+
                 (g.mode==='inclass'?
-                  '<div style="background:#FEF3D6;border:1.5px solid #F59E0B;border-radius:8px;padding:10px 14px;margin-bottom:6px">'+
-                    '<div style="font-size:.75rem;color:#7A5000;margin-bottom:6px;font-weight:600">📋 Danh sách từ làm sai / chưa làm xong:</div>'+
-                    '<div style="display:flex;flex-wrap:wrap;gap:5px">'+
+                  '<div style="background:#FEF3D6;border:1.5px solid #F59E0B;border-radius:8px;padding:10px 14px;margin-bottom:8px">'+
+                    '<div style="font-size:.75rem;color:#7A5000;margin-bottom:6px;font-weight:600">📋 Từ cần chép phạt ('+topMissed.length+'):</div>'+
+                    '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">'+
                       topMissed.map(function(w){
                         return '<span style="background:#fff;border:1px solid #F59E0B;color:#7A5000;border-radius:5px;padding:3px 9px;font-size:.82rem;font-weight:700">'+
                           VM.esc(w)+'</span>';
                       }).join('')+
                     '</div>'+
+                    '<button class="vm-btn vm-btn-ghost vm-btn-sm hist-copy-missed" '+
+                      'data-words="'+VM.esc(topMissed.join('\n'))+'" '+
+                      'style="font-size:.76rem">📋 Copy all</button>'+
                   '</div>':
                   '<div style="display:flex;flex-wrap:wrap;gap:5px">'+
                     topMissed.map(function(w){
@@ -1544,6 +1569,16 @@ function renderHistory(){
     }
 
     function bindHistActions(){
+      // Wire copy missed words buttons
+      VM.els('.hist-copy-missed').forEach(function(btn){
+        btn.onclick=function(e){
+          e.stopPropagation();
+          var words=btn.getAttribute('data-words')||'';
+          navigator.clipboard && navigator.clipboard.writeText(words)
+            .then(function(){ VM.toast('Đã copy!','ok'); })
+            .catch(function(){ VM.toast('Không copy được.','warn'); });
+        };
+      });
       // Retry buttons
       VM.els('[data-hist-retry]').forEach(function(btn){
         btn.onclick=function(){

@@ -1248,7 +1248,24 @@ function renderResults() {
         container.innerHTML='<span style="font-size:.76rem;color:var(--vm-ink-3)">No detail found.</span>';
         return;
       }
-      container.innerHTML=
+      var latest = res.data[0] || {};
+      var mw = latest.missedWords || [];
+      var missedHtml = '';
+      if(mw.length){
+        missedHtml =
+          '<div style="background:#FEF3D6;border:1px solid #F59E0B;border-radius:7px;padding:10px 12px;margin-bottom:10px">'+
+            '<div style="font-size:.72rem;font-weight:700;color:#7A5000;margin-bottom:6px">'+
+              '⚠️ Từ cần chép ('+mw.length+')'+
+              (latest.timedOut?' · ⏰ Timeout':'')+(latest.absent?' · ⚠️ Absent':'')+
+            '</div>'+
+            '<div style="display:flex;flex-wrap:wrap;gap:4px">'+
+              mw.map(function(w){
+                return '<span style="background:#fff;border:1px solid #F59E0B;color:#7A5000;border-radius:4px;padding:2px 8px;font-size:.76rem;font-weight:600">'+VM.esc(w)+'</span>';
+              }).join('')+
+            '</div>'+
+          '</div>';
+      }
+      container.innerHTML= missedHtml +
         '<table style="width:100%;font-size:.78rem;border-collapse:collapse">'+
         '<thead><tr style="color:var(--vm-ink-3);font-size:.7rem;text-transform:uppercase">'+
           '<th style="text-align:left;padding:3px 8px">#</th>'+
