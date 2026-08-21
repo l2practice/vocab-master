@@ -984,9 +984,11 @@ function renderResults() {
     pageSize:     30,
     total:        0,
     totalPages:   1,
-    rows:         [],       // grouped rows currently displayed
+    rows:         [],
     recheckMap:   {},
     loading:      false,
+    sortCol:      'lastTimestamp',
+    sortDir:      'desc',
   };
 
   /* ── Shell ───────────────────────────────────── */
@@ -1171,9 +1173,28 @@ function renderResults() {
       '<div style="overflow-x:auto">'+
       '<table class="vm-table"><thead><tr>'+
         '<th style="width:28px"></th>'+
-        '<th>Last attempt</th><th>Student ID</th><th>Name</th><th>Class</th>'+
-        '<th>Assignment</th><th>Mode</th><th>Best score</th>'+
-        '<th>Attempts</th><th>Goals</th><th>Re-check</th>'+
+        (function(){
+          var cols2=[
+            {k:'lastTimestamp',l:'Last attempt'},
+            {k:'studentId',l:'Student ID'},
+            {k:'name',l:'Name'},
+            {k:'class',l:'Class'},
+            {k:'title',l:'Assignment'},
+            {k:'mode',l:'Mode'},
+            {k:'bestScore',l:'Best score'},
+            {k:'attempts',l:'Attempts'},
+            {k:'goals',l:'Goals'},
+            {k:'recheck',l:'Re-check',nosort:true},
+          ];
+          return cols2.map(function(c){
+            if(c.nosort) return '<th>'+c.l+'</th>';
+            var active=RS.sortCol===c.k;
+            var arrow=active?(RS.sortDir==='asc'?'↑':'↓'):'';
+            return '<th class="sortable'+(active?' sort-'+(RS.sortDir==='asc'?'asc':'desc'):'')+'" data-sortcol="'+c.k+'" style="cursor:pointer">'+
+              c.l+(arrow?'<span style="margin-left:3px;font-size:.7rem">'+arrow+'</span>':'')+
+            '</th>';
+          }).join('');
+        })()+
       '</tr></thead>'+
       '<tbody id="rsTbody">'+rowsHtml+'</tbody>'+
       '</table></div>'+pager;
@@ -1708,38 +1729,152 @@ function renderTranslate(){
 function loadTrStats(setId){
   var wrap=document.getElementById('trStatsWrap');
   if(!wrap) return;
-  wrap.innerHTML='<div style="text-align:center;padding:20px;color:var(--vm-ink-3)">Loading stats…</div>';
+  wrap.innerHTML='<div style="text-align:center;padding:20px;color:var(--vm-ink-3)">⏳ Loading stats…</div>';
   VM.api('translate.stats',{setId:setId}).then(function(res){
     if(!res||!res.success){ wrap.innerHTML='<div class="vm-empty"><p>Error loading stats.</p></div>'; return; }
     var d=res.data;
+    var allStudents=d.students.slice();
+    var sortCol='lastTimestamp', sortDir='desc', searchQ='';
+
+    function sortedFiltered(){
+      var list=allStudents.filter(function(s){
+        if(!searchQ) return true;
+        var q=searchQ.toLowerCase();
+        return (s.studentId||'').toLowerCase().indexOf(q)>=0 ||
+               (s.name||'').toLowerCase().indexOf(q)>=0;
+      });
+      list.sort(function(a,b){
+        var av=a[sortCol]||'', bv=b[sortCol]||'';
+        if(typeof av==='number'&&typeof bv==='number') return sortDir==='asc'?av-bv:bv-av;
+        return sortDir==='asc'?String(av).localeCompare(String(bv)):String(bv).localeCompare(String(av));
+      });
+      return list;
+    }
+
+    function thSort(col,label){
+      var active=sortCol===col;
+      var arrow=active?(sortDir==='asc'?'↑':'↓'):'';
+      return '<th class="sortable'+(active?' sort-'+(sortDir==='asc'?'asc':'desc'):'')+'" '+
+        'data-tr-sort="'+col+'" style="cursor:pointer;user-select:none;white-space:nowrap">'+
+        label+(arrow?'<span style="margin-left:3px;font-size:.7rem">'+arrow+'</span>':'')+
+      '</th>';
+    }
+
+    function renderTable(){
+      var rows=sortedFiltered();
+      var tbodyHtml=rows.length?rows.map(function(s){
+        var cc=s.clearedCount, total=30;
+        var pct=Math.round(cc/total*100);
+        var col=cc>=total?'var(--vm-ok)':(cc>=20?'#A66B00':'var(--vm-ink)');
+        var scCol=s.bestScore>=85?'var(--vm-ok)':(s.bestScore>=60?'#A66B00':'var(--vm-danger)');
+        return '<tr>'+
+          '<td><b style="cursor:pointer;color:var(--vm-primary)" data-tr-sid-sort="'+VM.esc(s.studentId)+'">'+VM.esc(s.studentId)+'</b></td>'+
+          '<td>'+VM.esc(s.name)+'</td>'+
+          '<td style="text-align:center">'+s.runs+'</td>'+
+          '<td style="text-align:center"><b style="color:'+scCol+'">'+s.bestScore+'%</b></td>'+
+          '<td style="text-align:center">'+s.lastScore+'%</td>'+
+          '<td>'+
+            '<div style="display:flex;align-items:center;gap:6px">'+
+              '<b style="color:'+col+'">'+cc+'/'+total+'</b>'+
+              '<div style="flex:1;height:6px;background:var(--vm-border-2);border-radius:3px;min-width:60px">'+
+                '<div style="width:'+pct+'%;height:100%;background:'+col+';border-radius:3px"></div>'+
+              '</div>'+
+              '<span style="font-size:.72rem;color:var(--vm-ink-3)">'+pct+'%</span>'+
+            '</div>'+
+          '</td>'+
+          '<td style="font-size:.78rem;color:var(--vm-ink-3)">'+VM.esc(VM.fmtDate(s.lastTimestamp))+'</td>'+
+        '</tr>';
+      }).join(''):'<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--vm-ink-3)">No results match.</td></tr>';
+
+      var tbl=document.getElementById('trStatsTbl');
+      if(tbl) tbl.innerHTML=tbodyHtml;
+
+      // Re-wire sort headers
+      wrap.querySelectorAll('[data-tr-sort]').forEach(function(th){
+        th.onclick=function(){
+          var col=th.getAttribute('data-tr-sort');
+          if(sortCol===col) sortDir=sortDir==='asc'?'desc':'asc';
+          else{sortCol=col;sortDir='asc';}
+          renderHeaderRow();
+          renderTable();
+        };
+      });
+      // Student ID click → sort by ID
+      wrap.querySelectorAll('[data-tr-sid-sort]').forEach(function(el){
+        el.onclick=function(e){
+          e.stopPropagation();
+          if(sortCol==='studentId') sortDir=sortDir==='asc'?'desc':'asc';
+          else{sortCol='studentId';sortDir='asc';}
+          renderHeaderRow();
+          renderTable();
+        };
+      });
+    }
+
+    function renderHeaderRow(){
+      var thead=document.getElementById('trStatsThead');
+      if(!thead) return;
+      thead.innerHTML='<tr>'+
+        thSort('studentId','Student ID')+
+        thSort('name','Tên')+
+        thSort('runs','Runs')+
+        thSort('bestScore','Best %')+
+        thSort('lastScore','Last %')+
+        thSort('clearedCount','Cleared')+
+        thSort('lastTimestamp','Last active')+
+      '</tr>';
+      // Re-wire
+      thead.querySelectorAll('[data-tr-sort]').forEach(function(th){
+        th.onclick=function(){
+          var col=th.getAttribute('data-tr-sort');
+          if(sortCol===col) sortDir=sortDir==='asc'?'desc':'asc';
+          else{sortCol=col;sortDir='asc';}
+          renderHeaderRow(); renderTable();
+        };
+      });
+    }
+
     wrap.innerHTML=
-      '<div style="background:var(--vm-surface-2);border:1px solid var(--vm-border-2);border-radius:var(--vm-r);padding:16px 20px">'+
-        '<div style="display:flex;gap:20px;margin-bottom:14px;flex-wrap:wrap">'+
-          '<div><b>'+d.studentCount+'</b> <span style="font-size:.78rem;color:var(--vm-ink-3)">SV đã làm</span></div>'+
-          '<div><b>'+d.runsCount+'</b> <span style="font-size:.78rem;color:var(--vm-ink-3)">Lượt làm</span></div>'+
-          '<div><b>'+d.avgScore+'%</b> <span style="font-size:.78rem;color:var(--vm-ink-3)">Avg score</span></div>'+
-          '<div><b>'+d.avgCleared+'/30</b> <span style="font-size:.78rem;color:var(--vm-ink-3)">Avg cleared</span></div>'+
+      // KPI strip
+      '<div style="display:flex;gap:16px;margin-bottom:14px;flex-wrap:wrap;padding:14px 16px;'+
+        'background:var(--vm-surface-2);border:1px solid var(--vm-border-2);border-radius:var(--vm-r)">'+
+        '<div><div style="font-family:var(--vm-font-display);font-size:1.5rem;font-weight:700">'+d.studentCount+'</div>'+
+          '<div style="font-size:.72rem;color:var(--vm-ink-3);text-transform:uppercase;letter-spacing:.05em">SV đã làm</div></div>'+
+        '<div><div style="font-family:var(--vm-font-display);font-size:1.5rem;font-weight:700">'+d.runsCount+'</div>'+
+          '<div style="font-size:.72rem;color:var(--vm-ink-3);text-transform:uppercase;letter-spacing:.05em">Lượt làm</div></div>'+
+        '<div><div style="font-family:var(--vm-font-display);font-size:1.5rem;font-weight:700;color:var(--vm-ok)">'+d.avgScore+'%</div>'+
+          '<div style="font-size:.72rem;color:var(--vm-ink-3);text-transform:uppercase;letter-spacing:.05em">Avg score</div></div>'+
+        '<div><div style="font-family:var(--vm-font-display);font-size:1.5rem;font-weight:700">'+d.avgCleared+'/30</div>'+
+          '<div style="font-size:.72rem;color:var(--vm-ink-3);text-transform:uppercase;letter-spacing:.05em">Avg cleared</div></div>'+
+      '</div>'+
+      // Search + table
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'+
+        '<div class="vm-search" style="flex:1;max-width:340px">'+
+          VM.icon('search')+
+          '<input id="trStatsSearch" placeholder="Tìm Student ID hoặc tên…" style="font-size:.85rem">'+
         '</div>'+
-        (d.students.length?
-          '<table class="vm-table" style="font-size:.8rem"><thead><tr>'+
-            '<th>Student ID</th><th>Tên</th><th>Runs</th><th>Best</th><th>Last</th><th>Cleared</th><th>Last active</th>'+
-          '</tr></thead><tbody>'+
-          d.students.map(function(s){
-            var cc=s.clearedCount;
-            var col=cc>=30?'var(--vm-ok)':(cc>=20?'#A66B00':'var(--vm-ink)');
-            return '<tr>'+
-              '<td>'+VM.esc(s.studentId)+'</td>'+
-              '<td>'+VM.esc(s.name)+'</td>'+
-              '<td>'+s.runs+'</td>'+
-              '<td><b style="color:var(--vm-ok)">'+s.bestScore+'%</b></td>'+
-              '<td>'+s.lastScore+'%</td>'+
-              '<td><b style="color:'+col+'">'+cc+'/30</b></td>'+
-              '<td style="font-size:.74rem">'+VM.esc(VM.fmtDate(s.lastTimestamp))+'</td>'+
-            '</tr>';
-          }).join('')+'</tbody></table>':'<div style="color:var(--vm-ink-3);font-size:.8rem">Chưa có sinh viên làm.</div>')+
+        '<span style="font-size:.78rem;color:var(--vm-ink-3)" id="trStatsCount">'+d.students.length+' sinh viên</span>'+
+      '</div>'+
+      '<div class="vm-table-wrap" style="overflow-x:auto">'+
+        '<table class="vm-table">'+
+          '<thead id="trStatsThead"></thead>'+
+          '<tbody id="trStatsTbl"></tbody>'+
+        '</table>'+
       '</div>';
+
+    renderHeaderRow();
+    renderTable();
+
+    var searchInp=document.getElementById('trStatsSearch');
+    if(searchInp) searchInp.oninput=function(){
+      searchQ=searchInp.value.trim();
+      renderTable();
+      var cnt=document.getElementById('trStatsCount');
+      if(cnt) cnt.textContent=sortedFiltered().length+' sinh viên';
+    };
   });
 }
+
 
 // ── Teacher Settings ──────────────────────────────────────────────────
 function renderTeacherSettings(){
