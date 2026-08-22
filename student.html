@@ -1354,6 +1354,7 @@ function openRWQuiz(art){
 
 
 /* ── History ──────────────────────────────────── */
+var _histGroups = {}; // map expandId → group, for lazy-load
 function renderHistory(){
   showOverlay('Loading history…');
   loadMyResults(function(){
@@ -1480,35 +1481,41 @@ function renderHistory(){
               '<div style="display:flex;gap:5px;align-items:center">'+trend+'</div>'+
             '</div>'+
 
-            // Missed words — for inclass: show penalty list prominently
-            (topMissed.length?
-              '<div style="margin-bottom:12px">'+
-                '<div style="font-size:.72rem;font-weight:700;color:var(--vm-ink-3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px">'+
-                  (g.mode==='inclass'?'⚠️ Từ cần chép phạt':'Most Missed Words')+
-                '</div>'+
-                (g.mode==='inclass'?
-                  '<div style="background:#FEF3D6;border:1.5px solid #F59E0B;border-radius:8px;padding:10px 14px;margin-bottom:8px">'+
-                    '<div style="font-size:.75rem;color:#7A5000;margin-bottom:6px;font-weight:600">📋 Từ cần chép phạt ('+topMissed.length+'):</div>'+
+            // Missed words section
+            '<div id="hw_missed_'+expandId+'" style="margin-bottom:12px">'+
+              (g.mode==='inclass'?
+                // Inclass: load missed words from server if not in local data
+                (topMissed.length?
+                  '<div style="background:#FEF3D6;border:1.5px solid #F59E0B;border-radius:8px;padding:10px 14px">'+
+                    '<div style="font-size:.75rem;color:#7A5000;margin-bottom:6px;font-weight:600">⚠️ Từ cần chép phạt ('+topMissed.length+')</div>'+
                     '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">'+
                       topMissed.map(function(w){
-                        return '<span style="background:#fff;border:1px solid #F59E0B;color:#7A5000;border-radius:5px;padding:3px 9px;font-size:.82rem;font-weight:700">'+
-                          VM.esc(w)+'</span>';
+                        return '<span style="background:#fff;border:1px solid #F59E0B;color:#7A5000;border-radius:5px;padding:3px 9px;font-size:.82rem;font-weight:700">'+VM.esc(w)+'</span>';
                       }).join('')+
                     '</div>'+
                     '<button class="vm-btn vm-btn-ghost vm-btn-sm hist-copy-missed" '+
                       'data-words="'+VM.esc(topMissed.join('\n'))+'" '+
                       'style="font-size:.76rem">📋 Copy all</button>'+
-                  '</div>':
+                  '</div>' :
+                  // No local data — show loader then fetch from server
+                  '<div id="ic_missed_'+expandId+'" style="background:#FEF3D6;border:1.5px solid #F59E0B;border-radius:8px;padding:10px 14px">'+
+                    '<div style="font-size:.75rem;color:#7A5000">⏳ Đang tải từ sai…</div>'+
+                  '</div>'
+                ) :
+                // Homework / other: frequency chips
+                (topMissed.length?
+                  '<div style="font-size:.72rem;font-weight:700;color:var(--vm-ink-3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px">Most Missed Words</div>'+
                   '<div style="display:flex;flex-wrap:wrap;gap:5px">'+
                     topMissed.map(function(w){
-                      var freq = missedFreq[w];
-                      var col = freq>=3?'#FDECEA,#8B1A1A':(freq===2?'#FEF3D6,#7A5000':'#E3F5EE,#0A4D28');
-                      var parts = col.split(',');
-                      return '<span style="background:'+parts[0]+';color:'+parts[1]+';border-radius:5px;padding:3px 9px;font-size:.77rem;font-weight:600">'+
-                        VM.esc(w)+' <span style="opacity:.65">×'+freq+'</span></span>';
+                      var freq=missedFreq[w];
+                      var col=freq>=3?'#FDECEA,#8B1A1A':(freq===2?'#FEF3D6,#7A5000':'#E3F5EE,#0A4D28');
+                      var parts=col.split(',');
+                      return '<span style="background:'+parts[0]+';color:'+parts[1]+';border-radius:5px;padding:3px 9px;font-size:.77rem;font-weight:600">'+VM.esc(w)+' <span style="opacity:.65">×'+freq+'</span></span>';
                     }).join('')+
-                  '</div>')+
-              '</div>':'') +
+                  '</div>' : ''
+                )
+              )+
+            '</div>'+
 
             // Run history table
             '<div style="margin-bottom:10px">'+
@@ -1620,6 +1627,47 @@ function toggleHistGroup(id){
   if(toggle){
     var arrow=toggle.querySelector('div:last-child');
     if(arrow) arrow.textContent=isOpen?'▾':'▴';
+  }
+  // Lazy-load inclass missed words from server if placeholder exists
+  if(!isOpen){
+    var placeholder=document.getElementById('ic_missed_'+id);
+    if(placeholder){
+      // Find assignmentId from the group data
+      var grp=_histGroups&&_histGroups[id];
+      if(grp && grp.mode==='inclass'){
+        VM.api('result.missedWords',{assignmentId:grp.assignmentId,studentId:sess.studentId})
+          .then(function(res){
+            if(!res||!res.success) return;
+            var words=res.data.words||[];
+            if(!words.length){
+              placeholder.innerHTML='<div style="font-size:.75rem;color:#7A5000">✅ Không có từ nào sai</div>';
+              return;
+            }
+            var statusLabel=res.data.absent?'⚠️ Vắng mặt':res.data.timedOut?'⏰ Hết giờ':'✓ Đã nộp';
+            placeholder.innerHTML=
+              '<div style="font-size:.75rem;color:#7A5000;margin-bottom:6px;font-weight:600">'+
+                '⚠️ Từ cần chép phạt ('+words.length+') · '+statusLabel+
+              '</div>'+
+              '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">'+
+                words.map(function(w){
+                  return '<span style="background:#fff;border:1px solid #F59E0B;color:#7A5000;'+
+                    'border-radius:5px;padding:3px 9px;font-size:.82rem;font-weight:700">'+VM.esc(w)+'</span>';
+                }).join('')+
+              '</div>'+
+              '<button class="hist-copy-missed vm-btn vm-btn-ghost vm-btn-sm" '+
+                'data-words="'+VM.esc(words.join('\n'))+'" style="font-size:.76rem">📋 Copy all</button>';
+            // Wire copy button
+            var cb=placeholder.querySelector('.hist-copy-missed');
+            if(cb) cb.onclick=function(){
+              navigator.clipboard&&navigator.clipboard.writeText(words.join('\n'))
+                .then(function(){VM.toast('Đã copy '+words.length+' từ!','ok');})
+                .catch(function(){VM.toast('Không copy được.','warn');});
+            };
+          }).catch(function(){
+            placeholder.innerHTML='<div style="font-size:.75rem;color:var(--vm-danger)">❌ Không tải được.</div>';
+          });
+      }
+    }
   }
 }
 
