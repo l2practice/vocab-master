@@ -1386,6 +1386,13 @@ function renderHistory(){
       return new Date(lb.timestamp) - new Date(la.timestamp);
     });
 
+    // Build expandId → group map for lazy-load in toggleHistGroup
+    _histGroups = {};
+    groupList.forEach(function(g){
+      var eid = 'hist_'+g.assignmentId.replace(/[^a-z0-9]/gi,'_');
+      _histGroups[eid] = g;
+    });
+
     // ── Mode filter tabs ─────────────────────────────────────────
     var activeMode = 'all';
     var MODES = ['all','homework','inclass','readwise'];
@@ -1576,6 +1583,10 @@ function renderHistory(){
     }
 
     function bindHistActions(){
+      // Wire card header click → expand/collapse
+      VM.els('[data-hist-toggle]').forEach(function(el){
+        el.onclick=function(){ toggleHistGroup(el.getAttribute('data-hist-toggle')); };
+      });
       // Wire copy missed words buttons
       VM.els('.hist-copy-missed').forEach(function(btn){
         btn.onclick=function(e){
@@ -1618,6 +1629,7 @@ function renderHistory(){
 }
 
 function toggleHistGroup(id){
+  if(!id||id==='undefined') return;
   var el=document.getElementById(id);
   if(!el) return;
   var isOpen=el.style.display!=='none';
