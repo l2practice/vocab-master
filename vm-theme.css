@@ -93,7 +93,8 @@ h1,h2,h3,h4,.vm-display{font-family:var(--vm-font-display);letter-spacing:-.01em
 .vm-auth-alt a{color:var(--vm-primary);font-weight:600;text-decoration:none}
 .vm-auth-alt a:hover{text-decoration:underline}
 .vm-pass-wrap{position:relative}
-.vm-pass-toggle{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--vm-ink-3);font-size:.8rem;font-weight:600;padding:4px}
+.vm-pass-toggle{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--vm-ink-3);padding:4px;line-height:0;border-radius:4px;transition:color .15s}
+.vm-pass-toggle:hover{color:var(--vm-primary)}
 
 /* Loading overlay */
 .vm-loading-overlay{position:fixed;inset:0;background:rgba(13,79,58,.6);z-index:9999;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px}
