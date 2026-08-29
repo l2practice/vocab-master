@@ -209,7 +209,7 @@
 <div class="vm-modal-bg" id="translateModal">
   <div class="vm-modal" style="max-width:700px;max-height:90vh;overflow-y:auto">
     <button class="vm-modal-close" id="translateModalClose">✕</button>
-    <div class="vm-modal-title">✏️ Create Translate Assignment</div>
+    <div class="vm-modal-title">✏️ Tạo bài Luyện Dịch</div>
 
     <div style="display:flex;flex-direction:column;gap:14px">
 
@@ -217,19 +217,19 @@
         <div class="vm-field" style="flex:1;min-width:160px">
           <label class="vm-label">Lớp <span style="color:var(--vm-danger)">*</span></label>
           <select class="vm-input" id="tr-class" onchange="trClassChanged()">
-            <option value="">— Pick a class —</option>
+            <option value="">— Chọn lớp —</option>
           </select>
         </div>
         <div class="vm-field" style="flex:1;min-width:200px">
-          <label class="vm-label">Homework Source <span style="color:var(--vm-danger)">*</span></label>
+          <label class="vm-label">Bài Homework nguồn <span style="color:var(--vm-danger)">*</span></label>
           <select class="vm-input" id="tr-hw-src" onchange="trHWChanged()">
-            <option value="">— Pick homework —</option>
+            <option value="">— Chọn homework —</option>
           </select>
         </div>
       </div>
 
       <div class="vm-field">
-        <label class="vm-label">Title</label>
+        <label class="vm-label">Tiêu đề</label>
         <input class="vm-input" id="tr-title" placeholder="Dịch · London Underground Railway">
       </div>
 
@@ -250,12 +250,12 @@
 
       <div style="background:var(--vm-surface-2);border:1px solid var(--vm-border-2);border-radius:var(--vm-r-sm);padding:14px 16px">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-          <span style="font-size:.85rem;font-weight:600">✨ Create 30 sentences via AI</span>
-          <span style="font-size:.75rem;color:var(--vm-ink-3)">(Use teacher's Gemini key)</span>
+          <span style="font-size:.85rem;font-weight:600">✨ Sinh 30 câu bằng AI</span>
+          <span style="font-size:.75rem;color:var(--vm-ink-3)">(dùng Gemini key giáo viên)</span>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="vm-btn vm-btn-primary vm-btn-sm" id="trGenBtn" onclick="trGenItems()">✨ Create sentences</button>
-          <button class="vm-btn vm-btn-ghost vm-btn-sm" id="trRegenBtn" style="display:none" onclick="trGenItems()">↺ Retry</button>
+          <button class="vm-btn vm-btn-primary vm-btn-sm" id="trGenBtn" onclick="trGenItems()">✨ Sinh câu</button>
+          <button class="vm-btn vm-btn-ghost vm-btn-sm" id="trRegenBtn" style="display:none" onclick="trGenItems()">↺ Thử lại</button>
         </div>
         <div id="trGenStatus" style="font-size:.8rem;color:var(--vm-ink-3);margin-top:8px;min-height:16px"></div>
       </div>
@@ -275,8 +275,8 @@
     </div>
 
     <div class="vm-modal-footer">
-      <button class="vm-btn vm-btn-ghost" onclick="closeTrModal()">Cancel</button>
-      <button class="vm-btn vm-btn-primary" id="trSaveBtn" disabled onclick="saveTrSet()">💾 Save</button>
+      <button class="vm-btn vm-btn-ghost" onclick="closeTrModal()">Huỷ</button>
+      <button class="vm-btn vm-btn-primary" id="trSaveBtn" disabled onclick="saveTrSet()">💾 Lưu bài dịch</button>
     </div>
   </div>
 </div>
@@ -372,7 +372,7 @@ VM.renderShell({
 function switchTab(id) {
   state.activeTab = id;
   VM.setActiveNav(id);
-  var titles = { overview:'Overview', classes:'Classes', assign:'Assignments', hwbook:'HW Book', translate:'Translate Practice', results:'Results', settings:'Settings' };
+  var titles = { overview:'Overview', classes:'Classes', assign:'Assignments', hwbook:'HW Book', translate:'Luyện Dịch', results:'Results', settings:'Settings' };
   VM.setTitle(titles[id] || id);
   var content = document.getElementById('vmContent');
   content.innerHTML = '<div class="vm-empty"><span class="vm-spin-dark" style="width:24px;height:24px;border-width:3px"></span></div>';
@@ -997,7 +997,7 @@ function renderResults() {
     '<div class="vm-toolbar" style="margin-bottom:14px;flex-wrap:wrap;gap:8px">'+
       // Class selector — required before loading
       '<select class="vm-select" id="rsCls" style="min-width:170px">'+
-        '<option value="">— Pick a class —</option>'+
+        '<option value="">— Chọn lớp —</option>'+
         state.classes.map(function(cl){
           return '<option value="'+VM.esc(cl.classId)+'">'+VM.esc(cl.className)+'</option>';
         }).join('')+
@@ -1020,7 +1020,7 @@ function renderResults() {
     // Hint when no class selected
     '<div id="rsHint" style="text-align:center;padding:48px 20px;color:var(--vm-ink-3)">'+
       '<div style="font-size:2rem;margin-bottom:10px">📊</div>'+
-      '<p style="font-size:.9rem">Pick a class to load results.</p>'+
+      '<p style="font-size:.9rem">Chọn một lớp để xem kết quả.</p>'+
     '</div>'+
     '<div id="rsTableWrap"></div>';
 
@@ -1180,14 +1180,14 @@ function renderResults() {
       (isViewingIC?
         '<div style="background:#FEF3D6;border:1px solid #F59E0B;border-radius:var(--vm-r-sm);padding:12px 16px;margin-bottom:12px;display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap">'+
           '<div style="flex:1;min-width:200px">'+
-            '<div style="font-weight:700;font-size:.85rem;color:#7A5000;margin-bottom:3px">⚠️ Check attendance</div>'+
+            '<div style="font-weight:700;font-size:.85rem;color:#7A5000;margin-bottom:3px">⚠️ Điểm danh vắng mặt</div>'+
             '<div style="font-size:.76rem;color:#7A5000">'+
-              'Identify students without submission. Absences will be assigned all the incorrect words from the entire class.'+
+              'Quét lớp tìm SV chưa nộp bài. SV vắng sẽ nhận toàn bộ từ sai của cả lớp.'+
             '</div>'+
           '</div>'+
           '<button class="vm-btn vm-btn-sm" id="rMarkAbsent" '+
             'style="background:#F59E0B;color:#3A2600;border:none;border-radius:8px;padding:9px 16px;font-weight:700;font-size:.82rem;cursor:pointer;white-space:nowrap">'+
-            '⚠️ Mark absences & Penalty'+
+            '⚠️ Đánh vắng & giao từ phạt'+
           '</button>'+
         '</div>':'') +
       '<div style="overflow-x:auto">'+
@@ -1285,25 +1285,25 @@ function renderResults() {
     if(!btn) return;
     btn.onclick = function(){
       var aid = RS.assignmentId;
-      if(!aid){ VM.toast('Filter one In-class Assignment first.','warn'); return; }
+      if(!aid){ VM.toast('Filter bằng 1 bài In-class cụ thể trước.','warn'); return; }
       var a = state.assignments.find(function(x){ return x.assignmentId===aid; });
-      if(!a){ VM.toast('No results.','err'); return; }
+      if(!a){ VM.toast('Không tìm thấy bài.','err'); return; }
       if(!confirm(
-        'Mark absences "'+a.title+'" — Class '+clsName(a.classId)+'?\n\n'+
-        'Students without submission marked absent and get penalty.\n'+
-        'This action CANNOT be undone..'
+        'Đánh vắng cho bài "'+a.title+'" — lớp '+clsName(a.classId)+'?\n\n'+
+        'SV nào chưa nộp sẽ bị ghi vắng và nhận toàn bộ từ sai của cả lớp.\n'+
+        'Hành động này không thể hoàn tác.'
       )) return;
-      btn.disabled=true; btn.textContent='⏳ Loading…';
+      btn.disabled=true; btn.textContent='⏳ Đang xử lý…';
       VM.api('result.absentPenalty',{
         assignmentId: aid, classId: a.classId, title: a.title||'', total:(a.vocab||[]).length
       }).then(function(res){
-        btn.disabled=false; btn.textContent='⚠️ Mark absences and penalty';
+        btn.disabled=false; btn.textContent='⚠️ Đánh vắng & giao từ phạt';
         if(res&&res.success){
           var d=res.data||{};
-          if(d.absentCount===0) VM.toast('All assignments have been submitted - no absences.','warn',5000);
-          else { VM.toast(d.absentCount+' Absences were recorded. '+d.allMissedCount+' Penalty.','ok',5000); load(RS.page); }
+          if(d.absentCount===0) VM.toast('Tất cả SV đã nộp bài — không có vắng.','warn',5000);
+          else { VM.toast(d.absentCount+' SV vắng đã ghi nhận. '+d.allMissedCount+' từ phạt.','ok',5000); load(RS.page); }
         } else VM.toast('Lỗi: '+(res&&res.error),'err',5000);
-      }).catch(function(){ btn.disabled=false; btn.textContent='⚠️ Mark absences and penalty'; VM.toast('Connection Error.','err'); });
+      }).catch(function(){ btn.disabled=false; btn.textContent='⚠️ Đánh vắng & giao từ phạt'; VM.toast('Lỗi kết nối.','err'); });
     };
   }
 
@@ -1325,7 +1325,7 @@ function renderResults() {
         missedHtml =
           '<div style="background:#FEF3D6;border:1px solid #F59E0B;border-radius:7px;padding:10px 12px;margin-bottom:10px">'+
             '<div style="font-size:.72rem;font-weight:700;color:#7A5000;margin-bottom:6px">'+
-              '⚠️ Penalty ('+mw.length+')'+
+              '⚠️ Từ cần chép ('+mw.length+')'+
               (latest.timedOut?' · ⏰ Timeout':'')+(latest.absent?' · ⚠️ Absent':'')+
             '</div>'+
             '<div style="display:flex;flex-wrap:wrap;gap:4px">'+
@@ -1559,7 +1559,7 @@ function openTrModal(){
 
   // Populate class dropdown
   var sel = document.getElementById('tr-class');
-  sel.innerHTML = '<option value="">— Pick a class —</option>'+
+  sel.innerHTML = '<option value="">— Chọn lớp —</option>'+
     state.classes.map(function(c){ return '<option value="'+VM.esc(c.classId)+'">'+VM.esc(c.className)+'</option>'; }).join('');
   trClassChanged();
 
@@ -1579,7 +1579,7 @@ function trClassChanged(){
   var cls=document.getElementById('tr-class').value;
   var sel=document.getElementById('tr-hw-src');
   var hwList=state.assignments.filter(function(a){ return a.mode==='homework'&&(!cls||a.classId===cls); });
-  sel.innerHTML='<option value="">— Pick an assignment —</option>'+
+  sel.innerHTML='<option value="">— Chọn homework —</option>'+
     hwList.map(function(a){ return '<option value="'+VM.esc(a.assignmentId)+'">'+VM.esc(a.title)+'</option>'; }).join('');
   document.getElementById('tr-title').value='';
 }
@@ -1593,14 +1593,14 @@ function trHWChanged(){
 function trGenItems(){
   var aid=document.getElementById('tr-hw-src').value;
   var a=state.assignments.find(function(x){ return x.assignmentId===aid; });
-  if(!a){ VM.toast('Pick an assignment first.','warn'); return; }
+  if(!a){ VM.toast('Chọn bài Homework trước.','warn'); return; }
   var key=VM.geminiKey.get();
-  if(!key){ VM.toast('Need teacher's Gemini API key.','warn'); return; }
+  if(!key){ VM.toast('Cần Gemini API key của giáo viên.','warn'); return; }
 
   var statusEl=document.getElementById('trGenStatus');
   var genBtn=document.getElementById('trGenBtn');
   var regenBtn=document.getElementById('trRegenBtn');
-  genBtn.disabled=true; statusEl.textContent='⏳ Creating 30 sentences via Gemini…';
+  genBtn.disabled=true; statusEl.textContent='⏳ Đang sinh 30 câu với Gemini…';
 
   var vocab=(a.vocab||[]).map(function(v){ return v.word||v; }).join(', ');
   var prompt=[
@@ -1653,7 +1653,7 @@ function trGenItems(){
   function onSuccess(items){
     _trItems=items;
     genBtn.disabled=false; regenBtn.style.display='';
-    statusEl.textContent='✅ Complete '+items.length+' câu.';
+    statusEl.textContent='✅ Đã sinh '+items.length+' câu.';
     document.getElementById('trPreviewWrap').style.display='';
     document.getElementById('trItemCount').textContent='('+items.length+'/30)';
     document.getElementById('trItemsTbody').innerHTML=items.map(function(it,i){
@@ -1686,10 +1686,10 @@ function saveTrSet(){
   var start  =document.getElementById('tr-start').value;
   var dl     =document.getElementById('tr-deadline').value;
 
-  if(!classId){ VM.toast('Pick a class.','warn'); return; }
-  if(!title)  { VM.toast('Enter title.','warn'); return; }
-  if(!start)  { VM.toast('Enter starting time.','warn'); return; }
-  if(!_trItems.length){ VM.toast('Create AI sentences first.','warn'); return; }
+  if(!classId){ VM.toast('Chọn lớp.','warn'); return; }
+  if(!title)  { VM.toast('Nhập tiêu đề.','warn'); return; }
+  if(!start)  { VM.toast('Nhập giờ bắt đầu.','warn'); return; }
+  if(!_trItems.length){ VM.toast('Sinh câu AI trước.','warn'); return; }
 
   var setId='tr_'+Date.now().toString(36).toUpperCase();
   var payload={
@@ -1700,14 +1700,14 @@ function saveTrSet(){
   };
 
   document.getElementById('trSaveBtn').disabled=true;
-  showOverlay('Saving…');
+  showOverlay('Lưu bài dịch…');
 
   // Use apiLarge pattern (items JSON can be large)
   VM.apiLarge('translate.create', payload).then(function(res){
     hideOverlay();
     document.getElementById('trSaveBtn').disabled=false;
     if(res&&res.success){
-      VM.toast('Translate Practice has created!','ok');
+      VM.toast('Đã tạo bài Luyện Dịch!','ok');
       closeTrModal();
       renderTranslate();
     } else VM.toast('Lỗi: '+(res&&res.error||'Unknown'),'err',5000);
@@ -1729,7 +1729,7 @@ function renderTranslate(){
         c.innerHTML=
           '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">'+
             '<div style="font-size:.78rem;color:var(--vm-ink-3)">'+sets.length+' bài dịch</div>'+
-            '<button class="vm-btn vm-btn-primary vm-btn-sm" onclick="openTrModal()">+ Create Translate Practice</button>'+
+            '<button class="vm-btn vm-btn-primary vm-btn-sm" onclick="openTrModal()">+ Tạo bài dịch</button>'+
           '</div>'+
           (sets.length?
             '<div class="vm-table-wrap" style="overflow-x:auto"><table class="vm-table"><thead><tr>'+
@@ -1752,7 +1752,7 @@ function renderTranslate(){
                 '</td>'+
               '</tr>';
             }).join('')+'</tbody></table></div>':
-            '<div class="vm-empty"><p>No translate practice yet. Create one from existing homework.</p></div>')+
+            '<div class="vm-empty"><p>Chưa có bài dịch. Tạo từ Homework có sẵn.</p></div>')+
           '<div id="trStatsWrap" style="margin-top:18px"></div>';
 
         // Stats button
@@ -1900,9 +1900,9 @@ function loadTrStats(setId){
       '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'+
         '<div class="vm-search" style="flex:1;max-width:340px">'+
           VM.icon('search')+
-          '<input id="trStatsSearch" placeholder="Search Student ID or Name…" style="font-size:.85rem">'+
+          '<input id="trStatsSearch" placeholder="Tìm Student ID hoặc tên…" style="font-size:.85rem">'+
         '</div>'+
-        '<span style="font-size:.78rem;color:var(--vm-ink-3)" id="trStatsCount">'+d.students.length+' Student</span>'+
+        '<span style="font-size:.78rem;color:var(--vm-ink-3)" id="trStatsCount">'+d.students.length+' sinh viên</span>'+
       '</div>'+
       '<div class="vm-table-wrap" style="overflow-x:auto">'+
         '<table class="vm-table">'+
@@ -1919,7 +1919,7 @@ function loadTrStats(setId){
       searchQ=searchInp.value.trim();
       renderTable();
       var cnt=document.getElementById('trStatsCount');
-      if(cnt) cnt.textContent=sortedFiltered().length+' Student';
+      if(cnt) cnt.textContent=sortedFiltered().length+' sinh viên';
     };
   });
 }
@@ -1975,7 +1975,7 @@ function renderTeacherSettings(){
         '</div>'+
         '<div id="tsGemStatus" style="font-size:.75rem;margin-top:5px">'+
           (gemKey?'<span style="color:var(--vm-ok)">✓ Key saved — AI vocab generation & chat active</span>':
-                  '<span style="color:var(--vm-danger)">⚠️ No Gemini key — AI features unavailable.</span>')+
+                  '<span style="color:var(--vm-danger)">⚠️ No Gemini key — AI sinh câu dịch sẽ không hoạt động</span>')+
         '</div>'+
       '</div>'+
 
