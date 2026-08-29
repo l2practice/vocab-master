@@ -268,8 +268,8 @@ function canStartInclass(asgn) {
     var now = Date.now();
     st = now < start.getTime() ? 'upcoming' : now > end.getTime() ? 'closed' : 'open';
   }
-  if (st === 'upcoming') { VM.toast('Chưa đến giờ làm bài.', 'warn'); return false; }
-  if (st === 'closed')   { VM.toast('Session đã kết thúc.', 'warn');  return false; }
+  if (st === 'upcoming') { VM.toast('This session has not started yet.', 'warn'); return false; }
+  if (st === 'closed')   { VM.toast('This session has ended.', 'warn');  return false; }
   return true;
 }
 
@@ -306,16 +306,16 @@ function renderCards(items){
         st=_n<_s?'upcoming':_n>_e?'closed':'open';
       }
       var badge='', badgeColor='';
-      if(icDone){ badge='✅ Đã nộp'; badgeColor='var(--vm-ok)'; btnDisabled=true; btnLabel='Đã nộp ✓'; }
-      else if(st==='upcoming'){ badge='⏳ Chưa đến giờ'; badgeColor='#A66B00'; btnDisabled=true; btnLabel='Chưa mở'; }
-      else if(st==='closed'){ badge='⏹ Đã kết thúc'; badgeColor='var(--vm-ink-3)'; btnDisabled=true; btnLabel='Vắng'; }
-      else { badge='🟢 Đang mở'; badgeColor='var(--vm-ok)'; btnLabel='Bắt đầu →'; }
+      if(icDone){ badge='✅ Submitted'; badgeColor='var(--vm-ok)'; btnDisabled=true; btnLabel='Submitted ✓'; }
+      else if(st==='upcoming'){ badge='⏳ Not started'; badgeColor='#A66B00'; btnDisabled=true; btnLabel='Not open'; }
+      else if(st==='closed'){ badge='⏹ Ended'; badgeColor='var(--vm-ink-3)'; btnDisabled=true; btnLabel='Absent'; }
+      else { badge='🟢 Opening'; badgeColor='var(--vm-ok)'; btnLabel='Start →'; }
 
       var sessionLine='';
       if(a.sessionStart){
         sessionLine='<div style="font-size:.74rem;color:var(--vm-ink-3);margin-top:3px">'+
           '🕐 '+VM.esc(fmtSessionTime(a.sessionStart))+
-          (a.sessionDurationMin?' · '+a.sessionDurationMin+' phút':'')+
+          (a.sessionDurationMin?' · '+a.sessionDurationMin+' minutes':'')+
         '</div>';
       }
       icMeta='<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'+
@@ -513,7 +513,7 @@ function startQuiz(asgn){
           clearICTimer();
           if(S.quizState && !S.quizState.timedOut){
             S.quizState.timedOut = true;
-            VM.toast('⏰ Hết giờ! Auto-submit...', 'warn', 3000);
+            VM.toast('⏰ Time's up! Auto-submit...', 'warn', 3000);
             setTimeout(showResult, 1500);
           }
         }
@@ -780,7 +780,7 @@ function renderReadWise(){
         // Title
         '<div class="vm-field">'+
           '<label class="vm-label" style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--vm-ink-2)">'+
-            '📌 TIÊU ĐỀ BÀI ĐỌC <span style="color:var(--vm-danger)">*</span>'+
+            '📌 PASSAGE TITLE <span style="color:var(--vm-danger)">*</span>'+
           '</label>'+
           '<input class="vm-input" id="rwTitle" placeholder="Vd: The largest Roman villa in Britain">'+
         '</div>'+
@@ -789,7 +789,7 @@ function renderReadWise(){
         '<div class="vm-field">'+
           '<label class="vm-label" style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--vm-ink-2)">'+
             '📄 NỘI DUNG BÀI ĐỌC <span style="color:var(--vm-danger)">*</span>'+
-            ' <span style="font-weight:400;color:var(--vm-ink-3)">— tối thiểu 100 từ</span>'+
+            ' <span style="font-weight:400;color:var(--vm-ink-3)">— at least 100 words</span>'+
           '</label>'+
           '<textarea class="vm-input" id="rwPassageTa" rows="10" '+
             'placeholder="Dán bài đọc tiếng Anh vào đây…" '+
@@ -808,8 +808,8 @@ function renderReadWise(){
             'placeholder="AIza…" value="'+VM.esc(savedKey)+'" '+
             'style="font-family:monospace">'+
           '<p style="font-size:.75rem;color:var(--vm-ink-3);margin:5px 0 0">'+
-            'Dùng để dịch nghĩa, trích cụm từ và tạo quiz — <b>chỉ tốn 1 lần cho mỗi bài</b>, sau đó lưu lại dùng mãi. '+
-            '<a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--vm-primary)">Lấy key miễn phí →</a>'+
+            'Dùng để dịch nghĩa, trích cụm từ và tạo quiz — <b>Once per assignment</b>, then save and use forever. '+
+            '<a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--vm-primary)">Get free key →</a>'+
           '</p>'+
         '</div>'+
 
@@ -822,10 +822,10 @@ function renderReadWise(){
       // ── Saved articles ──
       '<div>'+
         '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'+
-          '<div style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--vm-ink-2)">📚 BÀI ĐÃ LƯU</div>'+
+          '<div style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--vm-ink-2)">📚 Saved Assignment</div>'+
           '<div style="display:flex;gap:8px">'+
             '<button class="vm-btn vm-btn-primary vm-btn-sm" id="rwCreateQuizBtn">✏️ Create Vocab Quiz</button>'+
-            '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="rwRefreshBtn">↺ Tải lại</button>'+
+            '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="rwRefreshBtn">↺ Reload</button>'+
           '</div>'+
         '</div>'+
         '<div id="rwSavedList">'+renderSavedList(_rwArticles)+
@@ -892,7 +892,7 @@ function renderReadWise(){
 
 function renderSavedList(articles){
   if(!articles||!articles.length)
-    return '<div class="vm-empty" style="padding:30px 20px"><p>Chưa có bài nào. Dán bài đọc và phân tích để lưu.</p></div>';
+    return '<div class="vm-empty" style="padding:30px 20px"><p>No texts yet. Paste a reading passage to analyze and save.</p></div>';
   return articles.map(function(a){
     return '<div style="display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid var(--vm-border-2)" data-rw-row="'+VM.esc(a.articleId)+'">'+
       '<div style="flex:1;min-width:0">'+
@@ -924,14 +924,14 @@ function analyseAndSaveArticle(){
 
   if(!title){ VM.toast('Nhập tiêu đề bài đọc.','warn'); return; }
   var wc = passage.split(/\s+/).filter(Boolean).length;
-  if(wc < 100){ VM.toast('Bài đọc phải có ít nhất 100 từ.','warn'); return; }
-  if(!key){ VM.toast('Nhập Gemini API key.','warn'); return; }
+  if(wc < 100){ VM.toast('Need at least 100 words.','warn'); return; }
+  if(!key){ VM.toast('Enter Gemini API key.','warn'); return; }
 
   setRWKey(key);
   var btn=document.getElementById('rwAnalyseBtn');
   btn.disabled=true;
 
-  status.textContent='⏳ Đang trích xuất từ vựng…';
+  status.textContent='⏳ Extracting Vocabulary…';
 
   // Step 1: extract vocab from passage using Gemini
   var vocabPrompt =
@@ -1028,8 +1028,8 @@ function analyseAndSaveArticle(){
   }).then(function(res){
     btn.disabled=false;
     if(res&&res.success){
-      status.textContent='✅ Đã lưu! Bài đọc sẵn sàng.';
-      VM.toast('Bài đọc đã được lưu!','ok');
+      status.textContent='✅ Saved! The reading passage is ready.';
+      VM.toast('Your reading passage has been saved!','ok');
       // Reload list
       VM.api('readwise.list',{studentId:sess.studentId}).then(function(r){
         if(r&&r.success){
@@ -1049,13 +1049,13 @@ function analyseAndSaveArticle(){
     var hasGroq = localStorage.getItem('vm_groq_key');
     if(!hasGroq){
       status.innerHTML = '❌ Gemini không khả dụng. '+
-        '<a href="https://console.groq.com/keys" target="_blank" style="color:var(--vm-primary);font-weight:700">Lấy Groq key miễn phí →</a>';
+        '<a href="https://console.groq.com/keys" target="_blank" style="color:var(--vm-primary);font-weight:700">Get free Groq key →</a>';
       var banner = document.createElement('div');
       banner.id='vmGroqBanner';
       banner.style.cssText='background:#FEF3D6;border:1.5px solid #F59E0B;border-radius:10px;padding:14px 16px;margin-top:10px';
       banner.innerHTML=
-        '<div style="font-weight:700;font-size:.88rem;color:#7A5000;margin-bottom:6px">⚠️ Tất cả Gemini model đều thất bại</div>'+
-        '<p style="font-size:.8rem;color:#7A5000;margin:0 0 10px">Dùng Groq (llama3-70b) miễn phí để thay thế. '+
+        '<div style="font-weight:700;font-size:.88rem;color:#7A5000;margin-bottom:6px">⚠️ All Gemini models failed</div>'+
+        '<p style="font-size:.8rem;color:#7A5000;margin:0 0 10px">Use free Groq (llama3-70b) to replace. '+
           '<a href="https://console.groq.com/keys" target="_blank" style="color:var(--vm-primary);font-weight:600">Lấy Groq key →</a></p>'+
         '<div style="display:flex;gap:8px">'+
           '<input id="rwGroqIn" type="password" placeholder="gsk_…" '+
@@ -1070,11 +1070,11 @@ function analyseAndSaveArticle(){
         if(!k){VM.toast('Nhập Groq key.','warn');return;}
         localStorage.setItem('vm_groq_key',k);
         banner.remove();
-        VM.toast('Groq key saved! Thử lại...','ok');
+        VM.toast('Groq key saved! Retry...','ok');
         document.getElementById('rwAnalyseBtn').click();
       };
     } else {
-      status.textContent='❌ Lỗi: '+msg;
+      status.textContent='❌ Error: '+msg;
       VM.toast('Error: '+msg,'err',5000);
     }
   });
@@ -1227,7 +1227,7 @@ function renderRWReader(art){
   }
 
   function renderCollocations(list){
-    if(!list||!list.length) return '<div style="color:var(--vm-ink-3);font-size:.8rem">Chưa có. Bấm 🔗 để trích xuất.</div>';
+    if(!list||!list.length) return '<div style="color:var(--vm-ink-3);font-size:.8rem">Chưa có. Clicl 🔗 to extract.</div>';
     return list.map(function(i){
       return '<div class="cefr-colloc-item"><div class="cefr-colloc-phrase">'+VM.esc(i.phrase)+'</div>'+
         '<div class="cefr-colloc-vi">'+VM.esc(i.meaning)+'</div></div>';
@@ -1494,7 +1494,7 @@ function renderHistory(){
                 // Inclass: load missed words from server if not in local data
                 (topMissed.length?
                   '<div style="background:#FEF3D6;border:1.5px solid #F59E0B;border-radius:8px;padding:10px 14px">'+
-                    '<div style="font-size:.75rem;color:#7A5000;margin-bottom:6px;font-weight:600">⚠️ Từ cần chép phạt ('+topMissed.length+')</div>'+
+                    '<div style="font-size:.75rem;color:#7A5000;margin-bottom:6px;font-weight:600">⚠️ Words for punishment ('+topMissed.length+')</div>'+
                     '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">'+
                       topMissed.map(function(w){
                         return '<span style="background:#fff;border:1px solid #F59E0B;color:#7A5000;border-radius:5px;padding:3px 9px;font-size:.82rem;font-weight:700">'+VM.esc(w)+'</span>';
@@ -1506,7 +1506,7 @@ function renderHistory(){
                   '</div>' :
                   // No local data — show loader then fetch from server
                   '<div id="ic_missed_'+expandId+'" style="background:#FEF3D6;border:1.5px solid #F59E0B;border-radius:8px;padding:10px 14px">'+
-                    '<div style="font-size:.75rem;color:#7A5000">⏳ Đang tải từ sai…</div>'+
+                    '<div style="font-size:.75rem;color:#7A5000">⏳ Loading wrong words…</div>'+
                   '</div>'
                 ) :
                 // Homework / other: frequency chips
@@ -1652,10 +1652,10 @@ function toggleHistGroup(id){
             if(!res||!res.success) return;
             var words=res.data.words||[];
             if(!words.length){
-              placeholder.innerHTML='<div style="font-size:.75rem;color:#7A5000">✅ Không có từ nào sai</div>';
+              placeholder.innerHTML='<div style="font-size:.75rem;color:#7A5000">✅ 100% correct</div>';
               return;
             }
-            var statusLabel=res.data.absent?'⚠️ Vắng mặt':res.data.timedOut?'⏰ Hết giờ':'✓ Đã nộp';
+            var statusLabel=res.data.absent?'⚠️ Absent':res.data.timedOut?'⏰ Time's up':'✓ Submitted';
             placeholder.innerHTML=
               '<div style="font-size:.75rem;color:#7A5000;margin-bottom:6px;font-weight:600">'+
                 '⚠️ Từ cần chép phạt ('+words.length+') · '+statusLabel+
@@ -1676,7 +1676,7 @@ function toggleHistGroup(id){
                 .catch(function(){VM.toast('Không copy được.','warn');});
             };
           }).catch(function(){
-            placeholder.innerHTML='<div style="font-size:.75rem;color:var(--vm-danger)">❌ Không tải được.</div>';
+            placeholder.innerHTML='<div style="font-size:.75rem;color:var(--vm-danger)">❌ Can't load.</div>';
           });
       }
     }
@@ -1753,7 +1753,7 @@ function renderSettings(){
       '<div class="vm-field" style="margin-top:4px">'+
         '<label class="vm-label" style="display:flex;align-items:center;justify-content:space-between">'+
           '<span>Groq API Key <span style="font-size:.7rem;font-weight:400;color:var(--vm-ink-3)">(Groq console — miễn phí)</span></span>'+
-          '<a href="https://console.groq.com/keys" target="_blank" style="font-size:.75rem;color:var(--vm-primary);font-weight:600">Lấy key →</a>'+
+          '<a href="https://console.groq.com/keys" target="_blank" style="font-size:.75rem;color:var(--vm-primary);font-weight:600">Get key →</a>'+
         '</label>'+
         '<div style="display:flex;gap:8px">'+
           '<input class="vm-input" id="stGroqKey" type="password" placeholder="gsk_…" value="'+VM.esc(groqKey)+'" style="flex:1">'+
@@ -1855,10 +1855,10 @@ function renderTranslateList(){
     }
     c.innerHTML = '<div class="vm-assign-grid">'+sets.map(function(s){
       var st = s.sessionStatus;
-      var badge='', badgeColor='', btnLabel='Bắt đầu', btnDis=false;
-      if(st==='upcoming'){ badge='⏳ Chưa mở'; badgeColor='#A66B00'; btnDis=true; btnLabel='Chưa mở'; }
-      else if(st==='closed'){ badge='✓ Đã đóng'; badgeColor='var(--vm-ink-3)'; btnDis=true; btnLabel='Đã đóng'; }
-      else { badge='🟢 Đang mở'; badgeColor='var(--vm-ok)'; }
+      var badge='', badgeColor='', btnLabel='Start', btnDis=false;
+      if(st==='upcoming'){ badge='⏳ Not open'; badgeColor='#A66B00'; btnDis=true; btnLabel='Not open'; }
+      else if(st==='closed'){ badge='✓ Đã đóng'; badgeColor='var(--vm-ink-3)'; btnDis=true; btnLabel='Closed'; }
+      else { badge='🟢 Opening'; badgeColor='var(--vm-ok)'; }
       return '<div class="vm-assign-card" data-tr-start="'+VM.esc(s.setId)+'">'+
         '<div class="vm-assign-card-title">'+VM.esc(s.title)+'</div>'+
         '<div style="font-size:.75rem;font-weight:700;color:'+badgeColor+';margin-bottom:4px">'+badge+'</div>'+
@@ -1878,8 +1878,8 @@ function renderTranslateList(){
         var sid = card.getAttribute('data-tr-start');
         var s = sets.find(function(x){ return x.setId===sid; });
         if(!s) return;
-        if(s.sessionStatus==='upcoming'){ VM.toast('Chưa đến giờ làm bài.','warn'); return; }
-        if(s.sessionStatus==='closed'){   VM.toast('Bài đã đóng.','warn'); return; }
+        if(s.sessionStatus==='upcoming'){ VM.toast('The session has not started yet.','warn'); return; }
+        if(s.sessionStatus==='closed'){   VM.toast('Closed.','warn'); return; }
         openTrSet(sid, s);
       };
     });
@@ -1894,7 +1894,7 @@ function fmtTrTime(str){
 }
 
 function openTrSet(setId, preview){
-  showOverlay('Đang tải bài…');
+  showOverlay('Loading…');
   VM.api('translate.get',{setId:setId}).then(function(r1){
     VM.api('translate.myProgress',{setId:setId,studentId:sess.studentId}).then(function(r2){
       hideOverlay();
@@ -1914,24 +1914,24 @@ function renderTrIntro(){
   var total   = (_trSet.items||[]).length;
   var pct     = total?Math.round(cleared/total*100):0;
   c.innerHTML=
-    '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="trBack" style="margin-bottom:12px">← Về danh sách</button>'+
+    '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="trBack" style="margin-bottom:12px">← Back</button>'+
     '<div class="vm-card" style="padding:24px 26px;max-width:500px;margin:0 auto">'+
-      '<h3 style="font-family:var(--vm-font-display);font-size:1.1rem;margin:0 0 12px">📖 Luật chơi</h3>'+
+      '<h3 style="font-family:var(--vm-font-display);font-size:1.1rem;margin:0 0 12px">📖 Rules</h3>'+
       '<ul style="font-size:.88rem;color:var(--vm-ink-2);line-height:1.75;padding-left:18px;margin:0 0 16px">'+
-        '<li>Mỗi lượt dịch <b>7 câu</b> xen kẽ EN↔VI</li>'+
-        '<li>Đạt ≥ <b>'+_trSet.passScore+'%</b> mới mở lượt tiếp</li>'+
-        '<li>AI chấm điểm theo ý nghĩa (không cần dịch y chang)</li>'+
-        '<li>Câu 💎 là "báu vật" — học kỹ pattern!</li>'+
-        '<li>Tiến độ: <b>'+cleared+'/'+total+'</b> câu đã đạt</li>'+
+        '<li>Each turn consists of <b>7</b> alternating sentences EN↔VI</li>'+
+        '<li>Complete ≥ <b>'+_trSet.passScore+'%</b> to open the next turn</li>'+
+        '<li>AI scores based on meaning (exact translation not required).</li>'+
+        '<li>Sentences with 💎 are "treasure" to study patterns!</li>'+
+        '<li>Progress: <b>'+cleared+'/'+total+'</b> sentences completed</li>'+
       '</ul>'+
       '<div class="vm-assign-pbar" style="margin-bottom:16px">'+
         '<div class="vm-assign-pfill'+(cleared>=total?' done':'').trim()+'" style="width:'+pct+'%"></div>'+
       '</div>'+
       (cleared>=total?
-        '<div style="color:var(--vm-ok);font-weight:700;margin-bottom:12px">🎉 Bạn đã hoàn thành tất cả 30 câu!</div>':'') +
+        '<div style="color:var(--vm-ok);font-weight:700;margin-bottom:12px">🎉 You have completed all 30 sentences!</div>':'') +
       '<div style="display:flex;gap:10px;flex-wrap:wrap">'+
         '<button class="vm-btn vm-btn-primary" id="trStartRun" style="padding:11px 24px">'+
-          (cleared>=total?'Làm lại từ đầu':'Bắt đầu lượt '+ (_trProgress.nextRunIndex||1))+
+          (cleared>=total?'Làm lại từ đầu':'Start the next turn '+ (_trProgress.nextRunIndex||1))+
         '</button>'+
       '</div>'+
     '</div>';
@@ -1972,12 +1972,12 @@ function renderTrQuestion(){
   var q=_trBatch[_trBatchIdx];
   if(!q){ renderTrRunResult(); return; }
   var total=_trBatch.length;
-  var dirLabel = q.direction==='en2vi'?'Dịch sang Tiếng Việt':'Dịch sang Tiếng Anh';
+  var dirLabel = q.direction==='en2vi'?'Translate to Vietnamese':'Translate to English';
   var dirBadge = q.direction==='en2vi'?'EN → VI':'VI → EN';
   var dirColor = q.direction==='en2vi'?'var(--vm-primary)':'#8B5CF6';
 
   c.innerHTML=
-    '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="trQBack" style="margin-bottom:10px">← Về danh sách</button>'+
+    '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="trQBack" style="margin-bottom:10px">← Back</button>'+
     '<div class="vm-quiz-wrap">'+
       '<div class="vm-quiz-header" style="margin-bottom:12px">'+
         '<div style="display:flex;align-items:center;gap:8px">'+
@@ -2110,13 +2110,13 @@ function showTrFeedback(item, answer, result){
       '<div style="font-family:var(--vm-font-display);font-size:1.5rem;font-weight:700;color:'+col+'">'+sc+'%</div>'+
       '<div style="flex:1">'+
         '<div style="font-size:.78rem;font-weight:700;color:'+col+';margin-bottom:3px">'+
-          (passedThis?'✅ Đạt — qua câu tiếp':'❌ Chưa đạt — cần dịch lại')+
+          (passedThis?'✅ Passed — next sentence':'❌ Failed — Retry')+
         '</div>'+
         '<div style="font-size:.82rem;color:var(--vm-ink-2)">'+VM.esc(result.feedback)+'</div>'+
       '</div>'+
     '</div>'+
     '<div style="font-size:.8rem;background:var(--vm-surface);border-radius:6px;padding:8px 12px;border-left:3px solid var(--vm-ok)">'+
-      '<b style="font-size:.72rem;color:var(--vm-ink-3);display:block;margin-bottom:3px">ĐÁP ÁN MẪU</b>'+
+      '<b style="font-size:.72rem;color:var(--vm-ink-3);display:block;margin-bottom:3px">SAMPLE ANSWERS</b>'+
       VM.esc(item.modelAnswer)+
     '</div>'+
     (item.pattern?'<div style="font-size:.78rem;color:#8B5CF6;margin-top:8px">💡 Pattern: <b>'+VM.esc(item.pattern)+'</b></div>':'')+
@@ -2207,22 +2207,22 @@ function renderTrRunResult(){
   c.innerHTML=
     '<div class="vm-result-banner" style="margin-top:8px">'+
       '<div class="vm-result-score" style="color:'+scCol+'">'+runScore+'%</div>'+
-      '<div class="vm-result-label">'+(passed?'✅ Đạt lượt này!':'❌ Chưa đạt lượt này')+
-        ' · '+cleared+'/'+total30+' câu đã clear</div>'+
+      '<div class="vm-result-label">'+(passed?'✅ Passed!':'❌ Failed')+
+        ' · '+cleared+'/'+total30+' sentences completed</div>'+
       '<div class="vm-assign-pbar" style="max-width:320px;margin:12px auto">'+
         '<div class="vm-assign-pfill'+(cleared>=total30?' done':'').trim()+'" style="width:'+pct+'%"></div></div>'+
       (passed&&cleared<total30?
         '<div style="font-size:.85rem;color:var(--vm-ink-2);margin-bottom:16px">'+
-          'Còn '+(total30-cleared)+' câu nữa. Hãy làm lượt tiếp!</div>':'') +
+          'Remain '+(total30-cleared)+' sentences. Complete the next turn!</div>':'') +
       (passed&&cleared>=total30?
-        '<div style="font-size:.9rem;color:var(--vm-ok);font-weight:700;margin-bottom:16px">🎉 Bạn đã hoàn thành tất cả câu!</div>':'') +
-      (!passed?'<div style="font-size:.85rem;color:var(--vm-ink-3);margin-bottom:16px">Làm lại lượt hiện tại để tăng điểm.</div>':'') +
+        '<div style="font-size:.9rem;color:var(--vm-ok);font-weight:700;margin-bottom:16px">🎉 All sentences are completed!</div>':'') +
+      (!passed?'<div style="font-size:.85rem;color:var(--vm-ink-3);margin-bottom:16px">Retry this turn to improve your score.</div>':'') +
       '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">'+
         (passed&&cleared<total30?
-          '<button class="vm-btn vm-btn-primary" id="trContinue" style="padding:11px 24px">Làm tiếp 7 câu →</button>':'') +
+          '<button class="vm-btn vm-btn-primary" id="trContinue" style="padding:11px 24px">Complete the next 7 sentences →</button>':'') +
         (!passed?
-          '<button class="vm-btn vm-btn-primary" id="trRetry" style="padding:11px 24px">Làm lại lượt này</button>':'') +
-        '<button class="vm-btn vm-btn-ghost" id="trBackList" style="padding:11px 20px">← Về danh sách</button>'+
+          '<button class="vm-btn vm-btn-primary" id="trRetry" style="padding:11px 24px">Retry this turn</button>':'') +
+        '<button class="vm-btn vm-btn-ghost" id="trBackList" style="padding:11px 20px">← Back</button>'+
       '</div>'+
     '</div>';
 
