@@ -1225,6 +1225,33 @@ function renderResults() {
 
   /* ── Bind expand + recheck ───────────────────── */
   function bindTableEvents(){
+    // ── Column header sort ──
+    VM.els('[data-sortcol]').forEach(function(th){
+      th.onclick = function(){
+        var col = th.getAttribute('data-sortcol');
+        if(RS.sortCol === col){
+          RS.sortDir = RS.sortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+          RS.sortCol = col;
+          RS.sortDir = (col==='lastTimestamp'||col==='bestScore'||col==='attempts') ? 'desc' : 'asc';
+        }
+        // Client-side sort of current loaded rows
+        RS.rows.sort(function(a,b){
+          var av = a[col], bv = b[col];
+          if(av == null) av = ''; if(bv == null) bv = '';
+          var asc = RS.sortDir === 'asc';
+          if(typeof av === 'number' && typeof bv === 'number') return asc ? av-bv : bv-av;
+          // Numeric strings (studentId like "20230001")
+          var an = parseFloat(av), bn = parseFloat(bv);
+          if(!isNaN(an) && !isNaN(bn)) return asc ? an-bn : bn-an;
+          return asc
+            ? String(av).localeCompare(String(bv))
+            : String(bv).localeCompare(String(av));
+        });
+        renderTable();
+      };
+    });
+
     // Accordion expand
     VM.els('.rs-expand-btn').forEach(function(btn){
       btn.onclick=function(){
