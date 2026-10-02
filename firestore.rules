@@ -1,0 +1,108 @@
+rules_version = '2';
+// VocabMaster — dán vào Firebase console → Firestore Database → Rules → Publish.
+//
+// Tài khoản chỉ được tạo bởi Apps Script (gas/FirebaseVM.gs, quyền quản trị).
+// Tài khoản GV mang custom claim role == 'teacher'. Mọi tài liệu thuộc lớp đều có
+// teacherUid → GV chỉ thấy lớp/SV/bài của mình; SV chỉ thấy bài của lớp mình và kết quả của chính mình.
+// Apps Script chạy với quyền chủ project nên không bị các quy tắc này giới hạn.
+service cloud.firestore {
+  match /databases/{db}/documents {
+    function signedIn()  { return request.auth != null; }
+    function isTeacher() { return signedIn() && request.auth.token.role == 'teacher'; }
+    function isMe(uid)   { return signedIn() && request.auth.uid == uid; }
+    function owns(data)  { return isTeacher() && data.teacherUid == request.auth.uid; }
+    function profile()   { return get(/databases/$(db)/documents/users/$(request.auth.uid)).data; }
+    function classOwned(cid) { return get(/databases/$(db)/documents/classes/$(cid)).data.teacherUid == request.auth.uid; }
+    function unchanged(f) {
+      return request.resource.data.get(f, null) == resource.data.get(f, null);
+    }
+
+    // Hồ sơ. Do Apps Script tạo; GV sửa được tên/lớp/điện thoại/email/khoá của SV lớp mình
+    // (chuyển sang lớp khác chỉ được khi lớp đó cũng của GV này).
+    match /users/{uid} {
+      allow read: if isMe(uid) || owns(resource.data);
+      allow update: if owns(resource.data)
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['archived', 'fullName', 'classId', 'phone', 'email'])
+                    && (unchanged('classId') || classOwned(request.resource.data.classId));
+      allow create, delete: if false;
+    }
+    // sha256(email) → mã SV, để đăng nhập bằng email. Chỉ đọc từng cái (phải biết email), không liệt kê được.
+    match /loginIndex/{h} {
+      allow get: if true;
+      allow list, write: if false;
+    }
+
+    match /classes/{id} {
+      allow read: if signedIn();
+      allow create: if isTeacher() && request.resource.data.teacherUid == request.auth.uid
+                    && request.resource.data.classId == id;
+      allow update: if owns(resource.data) && unchanged('teacherUid') && unchanged('classId');
+      allow delete: if false;
+    }
+
+    // Bài tập: ID do trình duyệt tạo, mỗi bài đúng MỘT tài liệu.
+    // extAll / ext{studentId} = gia hạn cho cả lớp / từng SV (chỉ GV ghi được).
+    match /assignments/{id} {
+      allow read: if owns(resource.data)
+                  || (signedIn() && resource.data.classId == profile().classId);
+      allow create: if isTeacher() && request.resource.data.teacherUid == request.auth.uid
+                    && classOwned(request.resource.data.classId);
+      allow update: if owns(resource.data) && unchanged('teacherUid')
+                    && (unchanged('classId') || classOwned(request.resource.data.classId));
+      allow delete: if false;   // xoá = đánh dấu deleted:true
+    }
+
+    // MỘT tài liệu cho mỗi (SV × bài): runs[] của mọi lần làm. SV ghi bài của mình;
+    // lớp và GV phải khớp hồ sơ. GV ghi được cho SV lớp mình (đánh vắng).
+    match /results/{id} {
+      allow read: if (signedIn() && resource.data.uid == request.auth.uid) || owns(resource.data);
+      allow create: if (isMe(request.resource.data.uid)
+                        && request.resource.data.classId == profile().classId
+                        && request.resource.data.teacherUid == profile().teacherUid)
+                    || (isTeacher() && request.resource.data.teacherUid == request.auth.uid);
+      allow update: if (isMe(resource.data.uid) && unchanged('uid') && unchanged('teacherUid')
+                        && request.resource.data.classId == profile().classId)
+                    || (owns(resource.data) && unchanged('uid') && unchanged('teacherUid'));
+      allow delete: if false;
+    }
+
+    // Dấu "đã chép phạt / re-check" của GV
+    match /rechecks/{id} {
+      allow read: if owns(resource.data);
+      allow create: if isTeacher() && request.resource.data.teacherUid == request.auth.uid;
+      allow update: if owns(resource.data) && unchanged('teacherUid');
+      allow delete: if false;
+    }
+
+    // Translate
+    match /trSets/{id} {
+      allow read: if owns(resource.data)
+                  || (signedIn() && resource.data.classId == profile().classId);
+      allow create: if isTeacher() && request.resource.data.teacherUid == request.auth.uid
+                    && classOwned(request.resource.data.classId);
+      allow update: if owns(resource.data) && unchanged('teacherUid') && unchanged('classId');
+      allow delete: if false;
+    }
+    match /trProgress/{id} {
+      allow read: if (signedIn() && resource.data.uid == request.auth.uid) || owns(resource.data);
+      allow create: if isMe(request.resource.data.uid)
+                    && request.resource.data.classId == profile().classId
+                    && request.resource.data.teacherUid == profile().teacherUid;
+      allow update: if isMe(resource.data.uid) && unchanged('uid') && unchanged('teacherUid');
+      allow delete: if false;
+    }
+
+    // ReadWise: bài đọc tự học, chỉ chủ bài thấy
+    match /readwise/{id} {
+      allow read, delete: if signedIn() && resource.data.uid == request.auth.uid;
+      allow create: if isMe(request.resource.data.uid);
+      allow update: if false;
+    }
+
+    // Từ của ngày: ai đăng nhập cũng đọc; chỉ Apps Script ghi
+    match /vocabBank/{id} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+  }
+}

@@ -9,11 +9,60 @@
   /* ── GAS endpoint ─────────────────────────────────────────── */
   var GAS = 'https://script.google.com/macros/s/AKfycbwj-XE8zxBifrn7BgcbIGegqeeoKAPnYIBUPX7dOuCQozNQvkOgmS9bT3tC92W3kwoM/exec';
 
+  /* ── Firebase ───────────────────────────────────────────────
+     Dán Web app config từ Firebase console ▸ Project settings ▸ Your apps.
+     enabled:false = app vẫn chạy bằng Apps Script + Google Sheet như cũ.
+     Chỉ bật true SAU KHI đã chạy xong các bước chuyển dữ liệu (gas/FIREBASE_SETUP.md). */
+  var VM_FIREBASE = global.VM_FIREBASE || {
+    enabled: false,
+    config: {
+      apiKey: '',
+      authDomain: '',
+      projectId: '',
+      storageBucket: '',
+      messagingSenderId: '',
+      appId: ''
+    },
+    studentDomain: 'students.vocabmaster.app'   // phải khớp VMFB.STUDENT_DOMAIN trong FirebaseVM.gs
+  };
+  global.VM_FIREBASE = VM_FIREBASE;
+
   var VM = {
     GAS: GAS,
+    firebaseOn: !!(VM_FIREBASE.enabled && VM_FIREBASE.config && VM_FIREBASE.config.apiKey),
     LOGIN_PAGE:   'login.html',
     STUDENT_HOME: 'student.html',
     TEACHER_HOME: 'teacher.html',
+  };
+
+  /* ── Tên bài luôn có tiền tố: Homework → HW_, In-class → IC_ ──
+     Bỏ tiền tố cũ (HW_/IC_/HW-/"IC ") rồi gắn lại theo mode, nên đổi mode cũng đúng. */
+  VM.prefixTitle = function (title, mode) {
+    var pre = mode === 'inclass' ? 'IC_' : 'HW_';
+    var t = String(title == null ? '' : title).trim().replace(/^(?:HW|IC)(?:\s*[_\-:.]\s*|\s+)/i, '');
+    return pre + t;
+  };
+
+  /* ── Firebase SDK + vm-fbdata.js: chỉ tải khi Firebase bật, 1 lần ── */
+  var FB_SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
+  var _fbLoad = null;
+  function loadScript(src) {
+    return new Promise(function (res, rej) {
+      var sc = document.createElement('script');
+      sc.src = src; sc.onload = res;
+      sc.onerror = function () { rej(new Error('Không tải được ' + src)); };
+      document.head.appendChild(sc);
+    });
+  }
+  VM.firebaseReady = function () {
+    if (!_fbLoad) {
+      _fbLoad = loadScript(FB_SDK + 'firebase-app-compat.js')
+        .then(function () { return Promise.all([loadScript(FB_SDK + 'firebase-auth-compat.js'), loadScript(FB_SDK + 'firebase-firestore-compat.js')]); })
+        .then(function () { return loadScript('vm-fbdata.js?v=1'); })
+        .then(function () { return global.FB; });
+      _fbLoad.catch(function () { _fbLoad = null; });   // cho phép thử lại sau lỗi mạng
+    }
+    return _fbLoad;
   };
 
   /* ── JSONP — only cross-origin method that works GH Pages→GAS ── */
@@ -41,7 +90,19 @@
     });
   }
 
-  VM.api = function (action, payload) { return jsonp(action, payload || {}); };
+  VM._legacyApi = function (action, payload) { return jsonp(action, payload || {}); };
+  VM.api = function (action, payload) {
+    payload = payload || {};
+    if (!VM.firebaseOn) return VM._legacyApi(action, payload);
+    return VM.firebaseReady().then(function (FB) { return FB.call(action, payload); })
+      .then(function (res) {
+        if (res && res.success === false && res.error === 'SESSION_EXPIRED') {
+          VM.session.clear();
+          if (!/(login|signup)\.html/.test(location.pathname)) location.href = VM.LOGIN_PAGE;
+        }
+        return res;
+      });
+  };
 
   /* ── VM.apiPost — fire-and-forget POST (vocab master pattern) ── */
   // Vocab master cũ dùng cách này: POST với text/plain → không có CORS preflight
@@ -66,6 +127,12 @@
   // The key insight: GAS processes POST even though browser can't read CORS response.
   // We pre-generate assignmentId client-side so both POST and JSONP use the same ID.
   VM.apiLarge = function (action, payload) {
+    // Firebase: MỘT lần ghi duy nhất với ID tạo sẵn ở trình duyệt → không thể sinh ra 2 bài.
+    if (VM.firebaseOn) {
+      var fp = {}; for (var k0 in payload) fp[k0] = payload[k0];
+      if (!fp.assignmentId && !fp.setId) fp.assignmentId = 'VM-' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2, 6).toUpperCase();
+      return VM.api(action, fp);
+    }
     // Pre-generate ID if creating (not editing)
     var isEdit = !!(payload.assignmentId);
     var aId = payload.assignmentId || ('VM-' + Date.now().toString(36).toUpperCase());
@@ -138,7 +205,11 @@
     clear:   function () { try { localStorage.removeItem(SKEY); } catch (e) {} try { sessionStorage.removeItem(SKEY); } catch (e) {} },
     role:    function () { var s = VM.session.get(); return s ? s.role : null; },
     require: function (role) { var s = VM.session.get(); if (!s || (role && s.role !== role)) { location.href = VM.LOGIN_PAGE; return null; } _refreshIdle(); return s; },
-    logout:  function () { VM.session.clear(); location.href = VM.LOGIN_PAGE; },
+    logout:  function () {
+      VM.session.clear();
+      var go = function () { location.href = VM.LOGIN_PAGE; };
+      if (VM.firebaseOn) VM.firebaseReady().then(function (FB) { return FB.signOut(); }).then(go, go); else go();
+    },
   };
 
   /* Activity → refresh idle */

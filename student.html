@@ -294,7 +294,9 @@ function renderCards(items){
     var dl=a.deadline?'⏰ '+VM.esc(a.deadline):'∞ No deadline';
 
     // In-class session info + status badge
-    var icDone = a.mode==='inclass' && att > 0; // already submitted — only 1 attempt allowed
+    // already submitted — only 1 attempt allowed, unless the teacher extended time for a run that timed out
+    var _last = res.slice().sort(function(x,y){return String(y.timestamp).localeCompare(String(x.timestamp));})[0];
+    var icDone = a.mode==='inclass' && att > 0 && !(a.extended && _last && _last.timedOut && !_last.absent);
     var icMeta='', btnLabel=att?'Try again →':'Start →', btnDisabled=false;
     if(a.mode==='inclass'){
       var st=a.sessionStatus;
