@@ -52,12 +52,16 @@ Sau khi ổn định vài tuần, nên **xoá cột Password trong tab Students/
 ## Tính năng mới
 - **Không còn bài bị nhân đôi.** Nguyên nhân cũ: lưu bài gửi 2 yêu cầu song song (POST + JSONP) lên Apps Script, cả hai cùng thấy "chưa có bài" nên cùng tạo, bản JSONP không có từ. Giờ mỗi bài chỉ có **một tài liệu**, mã bài tạo sẵn ở trình duyệt, ghi đúng một lần.
 - **Tên bài tự có tiền tố**: Homework → `HW_`, In-class → `IC_`. Gõ `HW_Unit 5`, `hw unit 5` hay `Unit 5` đều ra `HW_Unit 5`; đổi mode thì tiền tố đổi theo. Form hiển thị trước tên sẽ lưu.
-- **Gia hạn (⏱ Extend)** ở danh sách bài (cả Homework và In-class):
-  - *Cả lớp* hoặc *một số SV* (chọn từ danh sách lớp).
-  - Nút nhanh +15 phút / +30 phút / +1 giờ (In-class) hoặc +1 / +3 / +7 ngày (Homework), hoặc chọn giờ bất kỳ.
-  - In-class: SV được gia hạn thấy phiên còn mở và đồng hồ đếm ngược chạy đến giờ mới; SV đã bị tự nộp vì hết giờ được làm lại.
-  - Homework: bài quá hạn vẫn hiện cho SV được gia hạn. Hạn nộp dạng ngày (`2026-10-05`) nay tính đến **hết ngày đó** (trước đây hết hạn lúc 7h sáng).
-  - Mục "Gia hạn đang áp dụng" trong hộp thoại có nút **Gỡ**.
+- **Gia hạn (⏱ Extend)** ở danh sách bài, cho cả lớp hoặc một số SV (chọn từ danh sách lớp). Nhập **ngày / giờ / phút** hoặc bấm nút nhanh, hoặc chọn thời điểm cụ thể; dòng xem trước cho biết kết quả. Mục "Gia hạn đang áp dụng" có nút **Gỡ**.
+  - **In-class, một SV** (VD SV đi trễ): +5 phút vào giờ kết thúc của riêng SV đó. Bấm tiếp thì cộng dồn.
+  - **In-class, cả lớp**, hai cách:
+    - *Dời lịch kiểm tra* (mặc định): giờ bắt đầu và kết thúc cùng lùi, VD 17:30 → 17:35, hoặc +1 ngày / +1 tuần khi đổi lịch. Có thể chọn thẳng "giờ bắt đầu mới". Các gia hạn riêng đang có cũng được dời theo.
+    - *Chỉ kéo dài giờ kết thúc*: giờ bắt đầu giữ nguyên.
+  - SV được gia hạn thấy đồng hồ đếm ngược chạy đến giờ mới; SV đã bị tự nộp vì hết giờ được làm lại.
+  - **Homework, cả lớp hoặc từng SV**: cộng giờ + ngày (+1 giờ … +7 ngày) vào hạn nộp. Bài quá hạn vẫn hiện cho SV được gia hạn. Bài không có hạn nộp thì không cần gia hạn.
+  - Phép cộng tính từ mốc hiện tại của chính đối tượng đó (hoặc từ bây giờ nếu mốc đã qua).
+  - Hạn nộp dạng ngày (`2026-10-05`) nay tính đến **hết ngày đó** (trước đây hết hạn lúc 7h sáng).
+  - Cần bật Firebase (bản Sheet cũ không có tính năng này).
 
 ## Dữ liệu trên Firestore
 | Collection | Nội dung |

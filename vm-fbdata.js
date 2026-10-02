@@ -391,30 +391,73 @@ async function assignForStudent() {
   }).map(d => studentRow(d._id, d, u)));
 }
 
-/* Gia hạn — p: { assignmentId, scope:'class'|'students', studentIds:[], until:(ISO|datetime-local), clear:bool }
-   class → extAll;  students → ext.{studentId}.  clear:true gỡ gia hạn. */
+/* Gia hạn — p: { assignmentId, scope:'class'|'students', studentIds:[], clear:bool,
+                  deltaMin:(phút, cộng thêm)  HOẶC  until:(thời điểm cụ thể),
+                  kind:'shift' (chỉ In-class + cả lớp: dời cả giờ bắt đầu lẫn kết thúc) }
+
+   • cộng thêm = (giờ kết thúc/hạn nộp hiện tại của đối tượng, hoặc bây giờ nếu đã qua) + deltaMin
+     → SV nào đã được gia hạn riêng thì cộng tiếp từ mốc của chính SV đó.
+   • class → extAll;  students → ext.{studentId}.  clear:true gỡ gia hạn.
+   • shift → sửa thẳng sessionStart/sessionEnd của bài (đổi lịch kiểm tra), kèm các gia hạn đang có. */
+const MAX_EXT_MIN = 366 * 1440;
+function localInput(t) { const d = new Date(t); return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) + 'T' + pad2(d.getHours()) + ':' + pad2(d.getMinutes()); }
+// moves a stored time string by dMs, keeping its format ("2026-10-02T17:30" local, or ISO with Z)
+function shiftStr(v, dMs) {
+  v = str(v); const t = ms(v);
+  if (!v || !t) return v;
+  return /(?:[zZ]|[+-]\d{2}:\d{2})$/.test(v) ? new Date(t + dMs).toISOString() : localInput(t + dMs);
+}
 async function assignExtend(p) {
   const t = await teacher();
   if (!p.assignmentId) return fail('Thiếu assignmentId.');
   const ref = fs.doc('assignments/' + p.assignmentId);
   const snap = await ref.get();
   if (!snap.exists || snap.data().teacherUid !== t.uid) return fail('Không tìm thấy assignment.');
-  let until = '';
-  if (!p.clear) {
-    const t0 = ms(p.until);
-    if (!t0) return fail('Chọn thời điểm gia hạn.');
-    until = new Date(t0).toISOString();
-  }
+  const d = snap.data(), inclass = d.mode === 'inclass', now = Date.now();
   const FP = firebase.firestore.FieldPath;
-  if (p.scope === 'students') {
-    const sids = (p.studentIds || []).map(str).filter(Boolean);
-    if (!sids.length) return fail('Chọn ít nhất 1 sinh viên.');
-    const args = [];
-    sids.forEach(s => { args.push(new FP('ext', s), p.clear ? FV.delete() : until); });
-    await ref.update(...args);
-  } else {
-    await ref.update({ extAll: until });
+  const sids = (p.studentIds || []).map(str).filter(Boolean);
+  if (p.scope === 'students' && !sids.length) return fail('Chọn ít nhất 1 sinh viên.');
+
+  if (p.clear) {
+    if (p.scope === 'students') {
+      const args = []; sids.forEach(s => args.push(new FP('ext', s), FV.delete()));
+      await ref.update(...args);
+    } else await ref.update({ extAll: '' });
+    return ok();
   }
+
+  const deltaMin = Math.round(Number(p.deltaMin) || 0);
+  if (deltaMin < 0 || deltaMin > MAX_EXT_MIN) return fail('Thời gian gia hạn không hợp lệ.');
+  const abs = ms(p.until);
+  if (!deltaMin && !abs) return fail('Nhập thời gian gia hạn.');
+
+  // Dời lịch cả lớp (In-class): giờ bắt đầu và kết thúc cùng lùi
+  if (p.kind === 'shift') {
+    if (!inclass || p.scope === 'students') return fail('Dời lịch chỉ dùng cho bài In-class, áp dụng cho cả lớp.');
+    const dMs = deltaMin ? deltaMin * 60000 : abs - ms(d.sessionStart);
+    if (!ms(d.sessionStart)) return fail('Bài chưa có giờ bắt đầu.');
+    if (dMs <= 0) return fail('Giờ bắt đầu mới phải sau giờ hiện tại của bài.');
+    const patch = { sessionStart: shiftStr(d.sessionStart, dMs) };
+    if (d.sessionEnd) patch.sessionEnd = shiftStr(d.sessionEnd, dMs);
+    if (d.extAll) patch.extAll = shiftStr(d.extAll, dMs);
+    if (d.ext && Object.keys(d.ext).length) { const e = {}; Object.keys(d.ext).forEach(k => { e[k] = shiftStr(d.ext[k], dMs); }); patch.ext = e; }
+    await ref.update(patch);
+    return ok({ sessionStart: patch.sessionStart, sessionEnd: patch.sessionEnd || '' });
+  }
+
+  const base = inclass ? baseEnd(d) : deadlineMs(d.deadline);
+  if (!base) return fail(inclass ? 'Bài chưa có giờ kết thúc.' : 'Bài này không có hạn nộp nên không cần gia hạn.');
+  const cur = sid => Math.max(base, ms(d.extAll), sid ? ms(d.ext && d.ext[sid]) : 0);
+  const target = sid => abs || (Math.max(cur(sid), now) + deltaMin * 60000);
+
+  if (p.scope === 'students') {
+    const args = [], out = {};
+    sids.forEach(s => { out[s] = new Date(target(s)).toISOString(); args.push(new FP('ext', s), out[s]); });
+    await ref.update(...args);
+    return ok({ until: out });
+  }
+  const until = new Date(target(null)).toISOString();
+  await ref.update({ extAll: until });
   return ok({ until });
 }
 

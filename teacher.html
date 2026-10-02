@@ -192,11 +192,25 @@
       <div id="extStuList" style="max-height:180px;overflow-y:auto;border:1px solid var(--vm-border);border-radius:8px;padding:6px 10px;font-size:.85rem"></div>
     </div>
 
+    <div id="extKindWrap" style="display:none;margin-bottom:12px;font-size:.88rem">
+      <label style="cursor:pointer;display:block;margin-bottom:4px"><input type="radio" name="extKind" value="shift" checked> <b>Dời lịch kiểm tra</b> — giờ bắt đầu và kết thúc cùng lùi (VD 17:30 → 17:35, hoặc sang ngày khác)</label>
+      <label style="cursor:pointer;display:block"><input type="radio" name="extKind" value="end"> <b>Chỉ kéo dài giờ kết thúc</b> — giờ bắt đầu giữ nguyên</label>
+    </div>
+
     <div class="vm-field">
-      <label class="vm-label" id="extUntilLabel">Gia hạn đến</label>
+      <label class="vm-label" id="extAmountLabel">Thêm thời gian</label>
       <div id="extQuick" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px"></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:.88rem">
+        <input class="vm-input" id="extD" type="number" min="0" max="366" value="0" style="width:72px"> ngày
+        <input class="vm-input" id="extH" type="number" min="0" max="23" value="0" style="width:72px"> giờ
+        <input class="vm-input" id="extM" type="number" min="0" max="59" value="0" style="width:72px"> phút
+      </div>
+    </div>
+    <div class="vm-field">
+      <label class="vm-label" id="extAbsLabel">Hoặc chọn thời điểm cụ thể</label>
       <input class="vm-input" id="extUntil" type="datetime-local">
     </div>
+    <div id="extPreview" style="font-size:.86rem;font-weight:600;color:var(--vm-ok);min-height:1.3em"></div>
 
     <div id="extCurrent" style="margin:14px 0 4px"></div>
 
@@ -734,29 +748,63 @@ function extCurrentMs(a) {   // latest end that applies to the whole class right
   return Math.max(extBaseMs(a), a.extAll ? new Date(a.extAll).getTime() : 0);
 }
 
+function extFmtDur(min) {
+  var d = Math.floor(min / 1440), h = Math.floor((min % 1440) / 60), m = min % 60, o = [];
+  if (d) o.push(d + ' ngày'); if (h) o.push(h + ' giờ'); if (m) o.push(m + ' phút');
+  return o.join(' ') || '0 phút';
+}
+function extSetAmount(min) {
+  document.getElementById('extD').value = Math.floor(min / 1440);
+  document.getElementById('extH').value = Math.floor((min % 1440) / 60);
+  document.getElementById('extM').value = min % 60;
+  document.getElementById('extUntil').value = '';
+  renderExtPreview();
+}
+function extAmountMin() {
+  var n = function(id){ return Math.max(0, parseInt(document.getElementById(id).value, 10) || 0); };
+  return n('extD') * 1440 + n('extH') * 60 + n('extM');
+}
+function extScope() { return document.querySelector('input[name="extScope"]:checked').value; }
+function extIsShift() { return EXT.a.mode === 'inclass' && extScope() === 'class' && document.querySelector('input[name="extKind"]:checked').value === 'shift'; }
+
+function renderExtPreview() {
+  var a = EXT.a, isIC = a.mode === 'inclass', box = document.getElementById('extPreview');
+  var abs = document.getElementById('extUntil').value, min = extAmountMin(), shift = extIsShift();
+  document.getElementById('extAbsLabel').textContent = shift ? 'Hoặc chọn giờ bắt đầu mới' : (isIC ? 'Hoặc chọn giờ kết thúc mới' : 'Hoặc chọn hạn nộp mới');
+  if (!abs && !min) { box.textContent = ''; return; }
+  if (extScope() === 'students') {
+    box.textContent = abs ? 'Các SV đã chọn sẽ kết thúc lúc ' + extFmt(abs) : 'Mỗi SV được cộng thêm ' + extFmtDur(min) + ' vào giờ kết thúc hiện tại của chính SV đó.';
+    return;
+  }
+  if (shift) {
+    var st = new Date(a.sessionStart).getTime(), dMs = abs ? new Date(abs).getTime() - st : min * 60000;
+    box.textContent = dMs > 0 ? 'Bắt đầu ' + extFmt(st + dMs) + ' · kết thúc ' + extFmt(extBaseMs(a) + dMs) : 'Giờ bắt đầu mới phải sau giờ hiện tại của bài.';
+    return;
+  }
+  box.textContent = 'Kết thúc mới: ' + extFmt(abs ? new Date(abs).getTime() : Math.max(extCurrentMs(a), Date.now()) + min * 60000);
+}
+
 function openExtendModal(aid) {
+  if (!VM.firebaseOn) { VM.toast('Gia hạn cần bật Firebase (xem gas/FIREBASE_SETUP.md).', 'warn', 5000); return; }
   var a = state.assignments.find(function(x){ return x.assignmentId === aid; });
   if (!a) { VM.toast('Không tìm thấy bài.', 'err'); return; }
   EXT.a = a; EXT.roster = []; EXT.picked = {};
   var isIC = a.mode === 'inclass';
   document.getElementById('extTitle').textContent = '⏱ Gia hạn — ' + a.title;
-  document.getElementById('extUntilLabel').textContent = isIC ? 'Phiên làm bài kết thúc lúc' : 'Hạn nộp mới';
+  document.getElementById('extAmountLabel').textContent = isIC ? 'Thêm thời gian' : 'Gia hạn thêm';
   document.querySelector('input[name="extScope"][value="class"]').checked = true;
+  document.querySelector('input[name="extKind"][value="shift"]').checked = true;
+  document.getElementById('extKindWrap').style.display = isIC ? '' : 'none';
   document.getElementById('extStuWrap').style.display = 'none';
   document.getElementById('extStuSearch').value = '';
-
-  var cur = extCurrentMs(a);
   renderExtInfo();
 
-  // quick buttons add to whichever is later: now or the current end
-  var from = Math.max(Date.now(), cur);
-  var opts = isIC ? [['+15 phút', 15], ['+30 phút', 30], ['+1 giờ', 60]] : [['+1 ngày', 1440], ['+3 ngày', 4320], ['+7 ngày', 10080]];
+  var opts = isIC ? [['+5 phút', 5], ['+10 phút', 10], ['+15 phút', 15], ['+30 phút', 30], ['+1 giờ', 60], ['+1 ngày', 1440], ['+1 tuần', 10080]]
+                  : [['+1 giờ', 60], ['+3 giờ', 180], ['+6 giờ', 360], ['+12 giờ', 720], ['+1 ngày', 1440], ['+3 ngày', 4320], ['+7 ngày', 10080]];
   var q = document.getElementById('extQuick');
   q.innerHTML = opts.map(function(o){ return '<button type="button" class="vm-btn vm-btn-ghost vm-btn-sm" data-add="' + o[1] + '">' + o[0] + '</button>'; }).join('');
-  VM.els('[data-add]', q).forEach(function(b){
-    b.onclick = function(){ document.getElementById('extUntil').value = extLocalInput(from + parseInt(b.getAttribute('data-add'), 10) * 60000); };
-  });
-  document.getElementById('extUntil').value = extLocalInput(from + opts[0][1] * 60000);
+  VM.els('[data-add]', q).forEach(function(b){ b.onclick = function(){ extSetAmount(parseInt(b.getAttribute('data-add'), 10)); }; });
+  extSetAmount(isIC ? 5 : 1440);
   renderExtCurrent();
   document.getElementById('extModal').classList.add('show');
 }
@@ -764,7 +812,8 @@ function openExtendModal(aid) {
 function renderExtInfo() {
   var a = EXT.a, base = extBaseMs(a);
   document.getElementById('extInfo').innerHTML =
-    (a.mode === 'inclass' ? 'Phiên hiện tại kết thúc: ' : 'Hạn nộp hiện tại: ') +
+    (a.mode === 'inclass' && a.sessionStart ? 'Bắt đầu: <b>' + extFmt(a.sessionStart) + '</b> · ' : '') +
+    (a.mode === 'inclass' ? 'Kết thúc: ' : 'Hạn nộp hiện tại: ') +
     '<b>' + (base ? extFmt(base) : 'không giới hạn') + '</b>' +
     (a.extAll ? '<br>Đã gia hạn cả lớp đến: <b>' + extFmt(a.extAll) + '</b>' : '');
 }
@@ -815,7 +864,7 @@ function sendExtend(body, okMsg) {
     loadAssignments(function(){
       if (state.activeTab === 'assign') renderAssignList();
       var a = state.assignments.find(function(x){ return x.assignmentId === id; });
-      if (a) { EXT.a = a; renderExtInfo(); renderExtCurrent(); if (EXT.roster.length) renderExtStudents(); }
+      if (a) { EXT.a = a; renderExtInfo(); renderExtCurrent(); renderExtPreview(); if (EXT.roster.length) renderExtStudents(); }
     });
   }).catch(function(){ hideOverlay(); VM.toast('Lỗi kết nối.', 'err'); });
 }
@@ -824,6 +873,8 @@ document.querySelectorAll('input[name="extScope"]').forEach(function(r){
   r.onchange = function(){
     var students = document.querySelector('input[name="extScope"]:checked').value === 'students';
     document.getElementById('extStuWrap').style.display = students ? '' : 'none';
+    document.getElementById('extKindWrap').style.display = (EXT.a.mode === 'inclass' && !students) ? '' : 'none';
+    renderExtPreview();
     if (students && !EXT.roster.length) {
       document.getElementById('extStuList').innerHTML = '<div style="color:var(--vm-ink-3)">Đang tải…</div>';
       VM.api('class.roster', { classId: EXT.a.classId }).then(function(res){
@@ -837,17 +888,28 @@ document.getElementById('extStuSearch').oninput = renderExtStudents;
 document.getElementById('extClose').onclick = document.getElementById('extCancel').onclick = function(){
   document.getElementById('extModal').classList.remove('show');
 };
+['extD', 'extH', 'extM'].forEach(function(id){
+  document.getElementById(id).oninput = function(){ document.getElementById('extUntil').value = ''; renderExtPreview(); };
+});
+document.getElementById('extUntil').oninput = function(){
+  if (this.value) { ['extD', 'extH', 'extM'].forEach(function(id){ document.getElementById(id).value = 0; }); }
+  renderExtPreview();
+};
+document.querySelectorAll('input[name="extKind"]').forEach(function(r){ r.onchange = renderExtPreview; });
 document.getElementById('extApply').onclick = function(){
-  var scope = document.querySelector('input[name="extScope"]:checked').value;
-  var until = document.getElementById('extUntil').value;
-  if (!until) { VM.toast('Chọn thời điểm gia hạn.', 'warn'); return; }
-  if (new Date(until).getTime() <= Date.now()) { VM.toast('Thời điểm gia hạn phải ở tương lai.', 'warn'); return; }
-  var body = { scope: scope, until: new Date(until).toISOString() };
+  var scope = extScope(), abs = document.getElementById('extUntil').value, min = extAmountMin(), shift = extIsShift();
+  if (!abs && !min) { VM.toast('Nhập thời gian gia hạn.', 'warn'); return; }
+  var body = { scope: scope, kind: shift ? 'shift' : 'extend' };
+  if (abs) {
+    var t = new Date(abs).getTime();
+    if (!shift && t <= Date.now()) { VM.toast('Thời điểm gia hạn phải ở tương lai.', 'warn'); return; }
+    body.until = new Date(abs).toISOString();
+  } else body.deltaMin = min;
   if (scope === 'students') {
     body.studentIds = Object.keys(EXT.picked).filter(function(k){ return EXT.picked[k]; });
     if (!body.studentIds.length) { VM.toast('Chọn ít nhất 1 sinh viên.', 'warn'); return; }
   }
-  sendExtend(body, scope === 'class' ? 'Đã gia hạn cho cả lớp.' : 'Đã gia hạn cho ' + body.studentIds.length + ' sinh viên.');
+  sendExtend(body, shift ? 'Đã dời lịch kiểm tra.' : (scope === 'class' ? 'Đã gia hạn cho cả lớp.' : 'Đã gia hạn cho ' + body.studentIds.length + ' sinh viên.'));
 };
 
 // Title preview: name is always saved as HW_… / IC_…
