@@ -95,6 +95,7 @@ if (typeof VM === 'undefined') {
   throw new Error('no VM');
 }
 document.getElementById('brand').innerHTML = VM.brandLockup();
+VM.mountAuthHero('Làm bài từ vựng theo lớp, xem lại từ sai sau mỗi lượt và để AI phân tích bài đọc của riêng bạn.');
 
 // Already logged in?
 (function(){ var s=VM.session.get(); if(s&&s.role) location.href=s.role==='teacher'?VM.TEACHER_HOME:VM.STUDENT_HOME; })();

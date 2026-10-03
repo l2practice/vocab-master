@@ -291,6 +291,31 @@
   VM.brandLockup = function () {
     return '<a class="vm-logo" href="#"><span class="vm-logo-mark">' + VM.logoSVG + '</span><span class="vm-logo-name">VocabMaster</span></a>';
   };
+  /* Intro panel on the sign-in / sign-up pages (hidden below 980px) */
+  VM.mountAuthHero = function (blurb) {
+    var wrap = document.querySelector('.vm-auth-wrap'); if (!wrap || wrap.querySelector('.vm-auth-hero')) return;
+    var h = document.createElement('aside'); h.className = 'vm-auth-hero';
+    h.innerHTML =
+      '<div class="vm-auth-hero-top">' + VM.brandLockup() + '</div>' +
+      '<div class="vm-auth-hero-body">' +
+        '<span class="vm-auth-tag"><i></i>Vocabulary · Quiz · AI</span>' +
+        '<h2 class="vm-auth-hero-title">Learn.<br>Practice.<br><em>Master.</em></h2>' +
+        '<p class="vm-auth-hero-text">' + blurb + '</p>' +
+        '<div class="vm-auth-word" aria-hidden="true">' +
+          '<div class="vm-auth-word-eyebrow">✦ TODAY\'S WORD</div>' +
+          '<div class="vm-auth-word-main">resilient <span>/rɪˈzɪliənt/</span></div>' +
+          '<div class="vm-auth-word-vi">kiên cường, mau phục hồi</div>' +
+          '<div class="vm-auth-word-chips"><b>tough</b><b>adaptable</b><b>strong</b></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="vm-auth-stats">' +
+        '<div><b>HW</b><span>Homework</span></div>' +
+        '<div><b>IC</b><span>In-class</span></div>' +
+        '<div><b>AI</b><span>ReadWise</span></div>' +
+        '<div><b>&infin;</b><span>Luyện lại</span></div>' +
+      '</div>';
+    wrap.insertBefore(h, wrap.firstChild);
+  };
   (function () {
     if (document.getElementById('vm-fonts')) return;
     var l = document.createElement('link'); l.id = 'vm-fonts'; l.rel = 'stylesheet';
