@@ -14,7 +14,7 @@
      enabled:false = app vẫn chạy bằng Apps Script + Google Sheet như cũ.
      Chỉ bật true SAU KHI đã chạy xong các bước chuyển dữ liệu (gas/FIREBASE_SETUP.md). */
   var VM_FIREBASE = global.VM_FIREBASE || {
-    enabled: false,
+    enabled: true,
     config: {
       apiKey: 'AIzaSyAhoWEygnchnXPf1BaG2T6ZvpV0VY7oeeY',
       authDomain: 'vocabmaster-3a0dd.firebaseapp.com',
