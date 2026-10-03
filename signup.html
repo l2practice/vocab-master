@@ -133,6 +133,7 @@ if (typeof VM === 'undefined') {
   throw new Error('no VM');
 }
 document.getElementById('brand').innerHTML = VM.brandLockup();
+VM.mountAuthHero('Đăng ký bằng mã lớp do giảng viên cung cấp để nhận bài Homework, In-class và theo dõi tiến độ của bạn.');
 
 function showLoading(msg){ document.getElementById('loadingMsg').textContent=msg||'Đang xử lý…'; document.getElementById('loadingOverlay').classList.add('show'); }
 function hideLoading(){ document.getElementById('loadingOverlay').classList.remove('show'); }
