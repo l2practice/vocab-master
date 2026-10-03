@@ -1,34 +1,50 @@
 /*───────────────────────────────────────────────────
   VocabMaster — shared theme (vm-theme.css)
-  "Forest Scholar": teal-green primary, warm amber CTA
+  "Origin": ArticuWrite layout (floating icon rail, soft white panels, pill buttons) in travel-site colours (sand, forest green, earth orange)
 ───────────────────────────────────────────────────*/
 :root {
-  --vm-primary:      #1B7F5E;
-  --vm-primary-dk:   #0D4F3A;
-  --vm-primary-lt:   #E3F5EE;
-  --vm-accent:       #F5A623;
-  --vm-accent-dk:    #D98A0B;
-  --vm-ok:           #34A853;
-  --vm-warn:         #FBBC05;
-  --vm-offline:      #9AA0A6;
-  --vm-danger:       #EA4335;
-  --vm-bg:           #EAF5F0;
-  --vm-bg-grad:      linear-gradient(160deg,#EAF5F0 0%,#F2FAF6 55%,#FBF6EE 100%);
-  --vm-surface:      #FFFFFF;
-  --vm-surface-2:    #F5FAF7;
-  --vm-border:       #D0E8DC;
-  --vm-border-2:     #E4EFE9;
-  --vm-ink:          #0F2118;
-  --vm-ink-2:        #3D5A4A;
-  --vm-ink-3:        #7A9487;
+  /* brand */
+  --vm-primary:      #0F5C46;   /* forest green — actions, selected, active nav */
+  --vm-primary-hv:   #0A4D3A;
+  --vm-primary-dk:   #0E3B2E;   /* deep forest — main dark button, headings */
+  --vm-primary-lt:   #E2EDE0;   /* green wash — hover, chips */
+  --vm-accent:       #B8470F;   /* earth orange — marks, badges, eyebrow */
+  --vm-accent-dk:    #96380B;
+  --vm-accent-lt:    #FFF1E4;
+  --vm-sand:         #F1E3C2;
+  --vm-sand-2:       #FAF4E4;
+
+  /* status */
+  --vm-ok:           #1E7A3C;
+  --vm-warn:         #B7791F;
+  --vm-offline:      #A89C88;
+  --vm-danger:       #C23A2E;
+
+  /* surfaces */
+  --vm-bg:           #F4ECD8;   /* warm sand ground */
+  --vm-bg-grad:      #F4ECD8;
+  --vm-surface:      #FFFEFA;
+  --vm-surface-2:    #FAF4E4;   /* fields, chips, row hover */
+  --vm-border:       #E6DABB;
+  --vm-border-2:     #EFE5CC;
+
+  /* text */
+  --vm-ink:          #2B2118;
+  --vm-ink-2:        #54473A;
+  --vm-ink-3:        #665A4B;
   --vm-on-primary:   #FFFFFF;
-  --vm-font-display: 'Space Grotesk', system-ui, sans-serif;
-  --vm-font-body:    'Inter', system-ui, -apple-system, sans-serif;
-  --vm-r-sm: 10px; --vm-r: 14px; --vm-r-lg: 20px; --vm-r-pill: 999px;
-  --vm-shadow-sm: 0 1px 2px rgba(15,33,24,.06),0 1px 3px rgba(15,33,24,.04);
-  --vm-shadow:    0 4px 16px rgba(27,127,94,.09),0 2px 6px rgba(15,33,24,.05);
-  --vm-shadow-lg: 0 12px 40px rgba(27,127,94,.15),0 4px 12px rgba(15,33,24,.08);
-  --vm-ring:      0 0 0 3px rgba(27,127,94,.28);
+
+  /* type */
+  --vm-font-display: 'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --vm-font-body:    'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --vm-font-essay:   'Literata', Georgia, 'Times New Roman', serif;
+
+  /* shape + depth */
+  --vm-r-sm: 12px; --vm-r: 18px; --vm-r-lg: 24px; --vm-r-pill: 999px;
+  --vm-shadow-sm: 0 2px 10px rgba(92,64,20,.07);
+  --vm-shadow:    0 10px 30px rgba(92,64,20,.09);
+  --vm-shadow-lg: 0 18px 48px rgba(60,40,10,.20);
+  --vm-ring:      0 0 0 3px rgba(15,92,70,.34);
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
@@ -291,3 +307,178 @@ h1,h2,h3,h4,.vm-display{font-family:var(--vm-font-display);letter-spacing:-.01em
 .vm-menu-btn{display:none;background:none;border:none;cursor:pointer;color:var(--vm-ink);padding:4px}
 .vm-menu-btn svg{width:24px;height:24px}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+
+/*═══════════════════════════════════════════════════
+  ORIGIN layer — same structure as ArticuWrite (aw-theme.css):
+  floating icon rail, white soft-shadow panels, pill buttons, tile KPIs.
+  Colours from the travel site. Text ≥ 5.7:1, buttons ≥ 5.3:1.
+═══════════════════════════════════════════════════*/
+body{background:var(--vm-bg);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+h1,h2,h3,h4,.vm-display{font-weight:700;letter-spacing:-.015em;color:var(--vm-ink)}
+::selection{background:var(--vm-sand);color:var(--vm-ink)}
+button,.vm-btn,.vm-nav,.vm-tab,.vm-opt,.vm-rw-opt,.vm-page-btn{cursor:pointer}
+
+/* brand lockup */
+.vm-logo{color:var(--vm-ink)}
+.vm-logo-mark{width:44px;height:44px;border-radius:14px;background:var(--vm-primary-dk);box-shadow:none}
+.vm-logo-mark svg{width:24px;height:24px}
+.vm-logo-mark svg rect{fill:none}
+.vm-logo-mark svg text{font-size:17px;font-weight:700}
+.vm-logo-name{font-size:1.15rem;font-weight:700}
+
+/* buttons: pills; main = forest green, dark = deep forest */
+.vm-btn{min-height:44px;padding:11px 20px;border-radius:var(--vm-r-pill);font-weight:600;font-size:.92rem;letter-spacing:0;border:1.5px solid transparent;line-height:1.1}
+.vm-btn-primary{background:var(--vm-primary);color:#fff;box-shadow:none}
+.vm-btn-primary:hover{background:var(--vm-primary-hv);box-shadow:var(--vm-shadow)}
+.vm-btn-accent{background:var(--vm-primary-dk);color:#fff;box-shadow:none}
+.vm-btn-accent:hover{background:#17503F;color:#fff;box-shadow:var(--vm-shadow)}
+.vm-btn-ghost{background:var(--vm-surface-2);color:var(--vm-ink);border-color:transparent}
+.vm-btn-ghost:hover{background:var(--vm-primary-lt);color:var(--vm-primary-hv);border-color:transparent}
+.vm-btn-danger{background:var(--vm-danger);color:#fff}
+.vm-btn-danger:hover{background:#A52F24}
+.vm-btn-sm{min-height:36px;padding:8px 16px;font-size:.84rem}
+
+/* inputs: soft fields */
+.vm-label{font-size:.86rem;font-weight:600;color:var(--vm-ink-2);text-transform:none;letter-spacing:0}
+.vm-input{min-height:44px;padding:11px 16px;border:1.5px solid transparent;border-radius:14px;background:var(--vm-surface-2)}
+.vm-input:hover{background:#F6EEDA}
+.vm-input:focus{border-color:var(--vm-primary);background:#fff;box-shadow:var(--vm-ring)}
+.vm-input.field-error{background:#FFF0EC;border-color:var(--vm-danger)!important}
+:focus-visible{outline:none;box-shadow:var(--vm-ring);border-radius:10px}
+
+/* panels */
+.vm-card,.vm-kpi,.vm-table-wrap,.vm-result-banner,.vm-quiz-card{background:var(--vm-surface);border:none;border-radius:var(--vm-r-lg);box-shadow:var(--vm-shadow)}
+.vm-modal{border:none;border-radius:var(--vm-r-lg);box-shadow:var(--vm-shadow-lg)}
+.vm-modal-bg,.vm-loading-overlay{background:rgba(43,33,24,.5)}
+.vm-modal-title{font-size:1.35rem;font-weight:700}
+
+/* auth */
+.vm-auth-card{border:none;border-radius:28px;box-shadow:var(--vm-shadow-lg);padding:38px 36px}
+.vm-auth-title{font-size:1.75rem;font-weight:700}
+.vm-auth-alt a,.vm-auth-card a{color:var(--vm-primary)}
+
+/* dashboard shell: floating icon rail + floating topbar */
+.vm-shell{grid-template-columns:88px minmax(0,1fr);gap:16px;padding:16px}
+.vm-side{background:var(--vm-surface);border:none;border-radius:var(--vm-r-lg);box-shadow:var(--vm-shadow);padding:16px 6px;align-items:center;gap:4px;top:16px;height:calc(100vh - 32px);scrollbar-width:none}
+.vm-side::-webkit-scrollbar{display:none}
+.vm-side .vm-logo{margin:2px 0 16px}
+.vm-side .vm-logo-name,.vm-nav-group{display:none}
+.vm-side>div[style*="margin-top:auto"]{margin-top:auto!important;display:flex;flex-direction:column;align-items:center;padding-top:8px}
+.vm-nav{flex-direction:column;justify-content:center;gap:4px;width:72px;min-height:58px;padding:8px 2px;border-radius:16px;border-left:none;color:var(--vm-ink-3);font-size:.72rem;line-height:1.2;text-align:center;font-weight:500}
+.vm-nav span{white-space:normal;flex:0 0 auto;max-width:100%}
+.vm-nav svg{width:22px;height:22px}
+.vm-nav:hover{background:var(--vm-surface-2);color:var(--vm-ink)}
+.vm-nav.active{background:var(--vm-primary);color:#fff;font-weight:600;border-left:none}
+.vm-nav-badge{position:absolute;top:4px;right:6px;margin:0}
+.vm-main{gap:16px}
+.vm-topbar{background:transparent;border:none;padding:8px 8px 0}
+.vm-eyebrow{font-size:.82rem;font-weight:500;letter-spacing:0;text-transform:none;color:var(--vm-ink-3)}
+.vm-page-title{font-size:1.85rem;font-weight:700;letter-spacing:-.02em;line-height:1.15}
+.vm-user{background:var(--vm-surface);padding:5px 16px 5px 5px;border-radius:var(--vm-r-pill);box-shadow:var(--vm-shadow-sm)}
+.vm-avatar{background:#FDE7D6;color:#9A3B0A;font-size:.85rem}
+.vm-user-name{font-size:.88rem}
+.vm-content{padding:0 8px 24px}
+
+/* filters */
+.vm-search input{min-height:44px;padding:11px 16px 11px 44px;border:1.5px solid transparent;border-radius:var(--vm-r-pill);background:var(--vm-surface);box-shadow:var(--vm-shadow-sm)}
+.vm-search input:focus{border-color:var(--vm-primary);box-shadow:var(--vm-ring)}
+.vm-search svg{left:16px;width:18px;height:18px}
+.vm-select{min-height:44px;padding:10px 18px;border:1.5px solid transparent;border-radius:var(--vm-r-pill);background:var(--vm-surface);box-shadow:var(--vm-shadow-sm);color:var(--vm-ink)}
+.vm-select:focus{border-color:var(--vm-primary);box-shadow:var(--vm-ring)}
+
+/* KPI tiles (first one highlighted, like ArticuWrite) */
+.vm-kpi-row{gap:16px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+.vm-kpi{padding:18px 20px;border-radius:20px}
+.vm-kpi-label{font-size:.82rem;font-weight:500;letter-spacing:0;text-transform:none;color:var(--vm-ink-3);margin-bottom:8px}
+.vm-kpi-value{font-size:1.9rem;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.vm-kpi-row>.vm-kpi:first-child{background:var(--vm-primary)}
+.vm-kpi-row>.vm-kpi:first-child .vm-kpi-label,.vm-kpi-row>.vm-kpi:first-child .vm-kpi-sub{color:rgba(255,255,255,.88)}
+.vm-kpi-row>.vm-kpi:first-child .vm-kpi-value{color:#fff}
+
+/* tables */
+.vm-table-wrap{padding:6px 10px}
+.vm-table th{background:transparent;color:var(--vm-ink-3);font-weight:500;font-size:.8rem;letter-spacing:0;text-transform:none;border-bottom:1px solid var(--vm-border-2)}
+.vm-table td{border-bottom:1px solid var(--vm-border-2)}
+.vm-table tbody tr:hover{background:var(--vm-surface-2)}
+.vm-vocab-table th{background:transparent;color:var(--vm-ink-3);text-transform:none;letter-spacing:0;font-weight:500}
+.vm-vocab-table input{background:var(--vm-surface-2);border:1.5px solid transparent;border-radius:10px}
+.vm-vocab-table input:focus{border-color:var(--vm-primary);background:#fff}
+
+/* chips / tags */
+.vm-goal{border-radius:var(--vm-r-pill);padding:4px 12px}
+.vm-goal.met,.vm-goal.over{background:#DDF0E4;color:#1D6B4F}
+.vm-goal.partial{background:#FFF1C7;color:#7A5A00}
+.vm-goal.none{background:#FCE4E2;color:#A22A20}
+
+/* tabs: pills on a soft track */
+.vm-tabs{background:var(--vm-surface);border:none;border-radius:var(--vm-r-pill);padding:4px;gap:4px;box-shadow:var(--vm-shadow-sm);width:fit-content}
+.vm-tab{border-radius:var(--vm-r-pill);padding:9px 20px;border:none;margin:0;color:var(--vm-ink-2)}
+.vm-tab.active{background:var(--vm-primary);color:#fff;box-shadow:none}
+.vm-tab:hover:not(.active){background:var(--vm-surface-2);color:var(--vm-ink)}
+.vm-page-btn{border:none;background:var(--vm-surface);box-shadow:var(--vm-shadow-sm);border-radius:var(--vm-r-pill)}
+.vm-page-btn.active{background:var(--vm-primary);color:#fff}
+
+/* assignment cards = ArticuWrite library cards */
+.vm-assign-grid{gap:16px}
+.vm-assign-card{border:none;border-radius:20px;background:var(--vm-surface);box-shadow:var(--vm-shadow);padding:20px}
+.vm-assign-card:hover{transform:translateY(-3px);box-shadow:var(--vm-shadow-lg)}
+.vm-assign-card.complete{border:none!important;background:#EDF6EE;box-shadow:inset 0 0 0 2px var(--vm-ok),var(--vm-shadow)}
+.vm-assign-card-title{font-size:1.02rem;font-weight:600;line-height:1.3;text-transform:none;letter-spacing:0;overflow-wrap:anywhere}
+.vm-assign-progress{background:var(--vm-surface-2);border-radius:14px}
+.vm-assign-pbar{background:var(--vm-border-2);border-radius:var(--vm-r-pill)}
+.vm-assign-pfill{background:var(--vm-primary);border-radius:var(--vm-r-pill)}
+
+/* quiz */
+.vm-quiz-card{padding:32px 28px}
+.vm-opt,.vm-rw-opt{background:var(--vm-surface-2);border:1.5px solid transparent;border-radius:14px}
+.vm-opt:hover,.vm-rw-opt:hover{background:var(--vm-primary-lt);border-color:var(--vm-primary)}
+.vm-opt.correct,.vm-rw-opt.correct,.vm-quiz-input.correct{border-color:var(--vm-ok)!important;background:#DDF0E4!important;color:#145236!important}
+.vm-opt.wrong,.vm-rw-opt.wrong,.vm-quiz-input.wrong{border-color:var(--vm-danger)!important;background:#FCE4E2!important;color:#8E2218!important}
+.vm-quiz-input{background:var(--vm-surface-2);border:1.5px solid transparent;border-radius:14px}
+.vm-quiz-input:focus{background:#fff;border-color:var(--vm-primary)}
+.vm-quiz-bar{background:var(--vm-border-2);border-radius:var(--vm-r-pill)}
+.vm-quiz-bar-fill{background:var(--vm-primary);border-radius:var(--vm-r-pill)}
+.vm-result-badge{background:var(--vm-surface-2);border:none;border-radius:16px}
+.vm-rw-passage{background:var(--vm-surface);border:none;border-radius:var(--vm-r-lg);box-shadow:var(--vm-shadow);font-family:var(--vm-font-essay);font-size:1.02rem;line-height:1.8}
+.vm-rw-passage h2{color:var(--vm-primary-dk);font-weight:700}
+.vm-rw-q{border:none;border-radius:var(--vm-r);box-shadow:var(--vm-shadow-sm)}
+
+/* Today's word: forest gradient panel (ArticuWrite uses the primary colour) */
+.vm-tw{background:linear-gradient(120deg,#0A4D3A 0%,#0F5C46 55%,#2B7A5F 100%);border:none;border-radius:var(--vm-r-lg);box-shadow:0 14px 36px rgba(15,92,70,.28);padding:18px 22px}
+.vm-tw-glow{display:block}
+.vm-tw-eyebrow{color:#F3DFA8}
+.vm-tw-word{font-family:Georgia,'Times New Roman',serif;font-size:1.65rem;color:#fff}
+.vm-tw-ipa{color:#D5EBDD}
+.vm-tw-mean{color:#F4FAF5}
+.vm-tw-lbl,.vm-tw-prev-lbl{color:#F3DFA8}
+.vm-tw-chip{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.2);color:#fff;border-radius:16px}
+.vm-tw-prev{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.18);border-radius:14px}
+.vm-tw-prev-word{font-family:Georgia,'Times New Roman',serif;color:#fff}
+.vm-tw-prev-mean{color:#D5EBDD}
+.vm-tw-ex p{color:#E8F4EC;border-left-color:rgba(255,255,255,.3)}
+.vm-ai-panel{background:var(--vm-primary-dk);border-radius:var(--vm-r-lg)}
+.vm-ai-panel-sub{color:#F3DFA8}
+
+/* misc */
+.vm-empty{color:var(--vm-ink-3)}
+.vm-toast{background:var(--vm-primary-dk);border-radius:var(--vm-r-pill);padding:13px 24px}
+.vm-toast.ok{background:var(--vm-ok)}
+.vm-toast.err{background:var(--vm-danger)}
+.vm-toast.warn{background:#7A5000}
+.vm-spin-dark{border-color:rgba(15,92,70,.25);border-top-color:var(--vm-primary)}
+.vm-menu-btn{width:44px;height:44px;border-radius:50%;place-items:center;background:var(--vm-surface);box-shadow:var(--vm-shadow-sm)}
+
+@media(max-width:860px){
+  .vm-shell{grid-template-columns:minmax(0,1fr);padding:10px}
+  .vm-side{position:fixed;left:-110px;top:10px;height:calc(100vh - 20px);z-index:200;transition:left .2s;width:88px;box-shadow:var(--vm-shadow-lg)}
+  .vm-side.open{left:10px}
+  .vm-menu-btn{display:inline-grid!important}
+  .vm-topbar{padding:4px 2px 0;flex-wrap:wrap}
+  .vm-user-name,.vm-user-role{display:none}
+  .vm-user{padding:3px}
+  .vm-page-title{font-size:1.45rem}
+  .vm-content{padding:0 2px 20px}
+  .vm-kpi-row{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .vm-kpi{padding:14px 16px}.vm-kpi-value{font-size:1.5rem}
+}
