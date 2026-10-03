@@ -16,12 +16,12 @@
   var VM_FIREBASE = global.VM_FIREBASE || {
     enabled: false,
     config: {
-      apiKey: '',
-      authDomain: '',
-      projectId: '',
-      storageBucket: '',
-      messagingSenderId: '',
-      appId: ''
+      apiKey: 'AIzaSyAhoWEygnchnXPf1BaG2T6ZvpV0VY7oeeY',
+      authDomain: 'vocabmaster-3a0dd.firebaseapp.com',
+      projectId: 'vocabmaster-3a0dd',
+      storageBucket: 'vocabmaster-3a0dd.firebasestorage.app',
+      messagingSenderId: '199135021961',
+      appId: '1:199135021961:web:7e6bd1bca219b1ab32af58'
     },
     studentDomain: 'students.vocabmaster.app'   // phải khớp VMFB.STUDENT_DOMAIN trong FirebaseVM.gs
   };

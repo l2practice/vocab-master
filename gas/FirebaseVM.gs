@@ -30,8 +30,8 @@
 
 var VMFB = {
   // Firebase console → Project settings → General
-  PROJECT_ID: '',
-  API_KEY:    '',
+  PROJECT_ID: 'vocabmaster-3a0dd',
+  API_KEY:    'AIzaSyAhoWEygnchnXPf1BaG2T6ZvpV0VY7oeeY',
   // Phải khớp VM_FIREBASE.studentDomain trong vm-common.js
   STUDENT_DOMAIN: 'students.vocabmaster.app',
   // Lớp trong Sheet không có email GV → gán cho GV này ('' = GV đầu tiên trong tab Teachers)
