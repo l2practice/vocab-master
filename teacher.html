@@ -51,6 +51,7 @@
         <div class="vm-field" style="flex:2;min-width:200px">
           <label class="vm-label">Assignment Title <span style="color:var(--vm-danger)">*</span></label>
           <input class="vm-input" id="af-title" placeholder="VD: Unit 5 – Environment Vocabulary">
+          <div id="af-title-hint" style="font-size:.74rem;color:var(--vm-ink-3);margin-top:3px"></div>
         </div>
         <!-- Load from existing homework (shown only in inclass mode) -->
         <div id="af-load-hw-wrap" style="display:none;background:var(--vm-surface-2);border:1.5px solid var(--vm-accent);border-radius:var(--vm-r-sm);padding:12px 14px;margin-top:4px">
@@ -172,6 +173,54 @@
 </div>
 
 <!-- Create Class Modal -->
+<!-- Extend time modal (gia hạn cho cả lớp / từng sinh viên) -->
+<div class="vm-modal-bg" id="extModal">
+  <div class="vm-modal" style="max-width:560px;max-height:90vh;overflow-y:auto">
+    <button class="vm-modal-close" id="extClose">✕</button>
+    <div class="vm-modal-title" id="extTitle">⏱ Gia hạn</div>
+    <div id="extInfo" style="font-size:.84rem;color:var(--vm-ink-2);margin-bottom:12px"></div>
+
+    <div class="vm-field">
+      <label class="vm-label">Áp dụng cho</label>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:.88rem">
+        <label style="cursor:pointer"><input type="radio" name="extScope" value="class" checked> Cả lớp</label>
+        <label style="cursor:pointer"><input type="radio" name="extScope" value="students"> Một số sinh viên</label>
+      </div>
+    </div>
+    <div id="extStuWrap" style="display:none;margin-bottom:12px">
+      <input class="vm-input" id="extStuSearch" placeholder="Tìm theo mã SV hoặc tên…" style="margin-bottom:6px">
+      <div id="extStuList" style="max-height:180px;overflow-y:auto;border:1px solid var(--vm-border);border-radius:8px;padding:6px 10px;font-size:.85rem"></div>
+    </div>
+
+    <div id="extKindWrap" style="display:none;margin-bottom:12px;font-size:.88rem">
+      <label style="cursor:pointer;display:block;margin-bottom:4px"><input type="radio" name="extKind" value="shift" checked> <b>Dời lịch kiểm tra</b> — giờ bắt đầu và kết thúc cùng lùi (VD 17:30 → 17:35, hoặc sang ngày khác)</label>
+      <label style="cursor:pointer;display:block"><input type="radio" name="extKind" value="end"> <b>Chỉ kéo dài giờ kết thúc</b> — giờ bắt đầu giữ nguyên</label>
+    </div>
+
+    <div class="vm-field">
+      <label class="vm-label" id="extAmountLabel">Thêm thời gian</label>
+      <div id="extQuick" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px"></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:.88rem">
+        <input class="vm-input" id="extD" type="number" min="0" max="366" value="0" style="width:72px"> ngày
+        <input class="vm-input" id="extH" type="number" min="0" max="23" value="0" style="width:72px"> giờ
+        <input class="vm-input" id="extM" type="number" min="0" max="59" value="0" style="width:72px"> phút
+      </div>
+    </div>
+    <div class="vm-field">
+      <label class="vm-label" id="extAbsLabel">Hoặc chọn thời điểm cụ thể</label>
+      <input class="vm-input" id="extUntil" type="datetime-local">
+    </div>
+    <div id="extPreview" style="font-size:.86rem;font-weight:600;color:var(--vm-ok);min-height:1.3em"></div>
+
+    <div id="extCurrent" style="margin:14px 0 4px"></div>
+
+    <div class="vm-modal-footer">
+      <button class="vm-btn vm-btn-ghost" id="extCancel">Đóng</button>
+      <button class="vm-btn vm-btn-primary" id="extApply">Gia hạn</button>
+    </div>
+  </div>
+</div>
+
 <div class="vm-modal-bg" id="classModal">
   <div class="vm-modal" style="max-width:420px">
     <button class="vm-modal-close" id="classModalClose">✕</button>
@@ -650,11 +699,15 @@ function renderAssignList() {
         '<td>'+(a.mode==='homework'?a.requiredGoals:'—')+'</td>' +
         '<td>'+(a.vocab?a.vocab.length:0)+'</td>' +
         '<td>' +
+          '<button class="vm-btn vm-btn-ghost vm-btn-sm" data-ext-asgn="'+VM.esc(a.assignmentId)+'">⏱ Extend</button> ' +
           '<button class="vm-btn vm-btn-ghost vm-btn-sm" data-edit-asgn="'+VM.esc(a.assignmentId)+'">Edit</button> ' +
           '<button class="vm-btn vm-btn-danger vm-btn-sm" data-del-asgn="'+VM.esc(a.assignmentId)+'">Delete</button>' +
         '</td></tr>';
     }).join('') + '</tbody></table></div>';
 
+  VM.els('[data-ext-asgn]').forEach(function(btn){
+    btn.onclick = function(){ openExtendModal(btn.getAttribute('data-ext-asgn')); };
+  });
   VM.els('[data-edit-asgn]').forEach(function(btn){
     btn.onclick = function(){ var a=state.assignments.find(function(x){return x.assignmentId===btn.getAttribute('data-edit-asgn');}); if(a) openAssignModal(a); };
   });
@@ -668,6 +721,205 @@ function renderAssignList() {
     };
   });
 }
+
+// ── Extend time (gia hạn) ──────────────────────────────────────────
+var EXT = { a: null, roster: [], picked: {} };
+
+function extBaseMs(a) {   // end of the window / deadline WITHOUT extensions
+  if (a.mode === 'inclass') {
+    if (a.sessionEnd) return new Date(a.sessionEnd).getTime() || 0;
+    var s = new Date(a.sessionStart).getTime();
+    return s ? s + (a.sessionDurationMin || 0) * 60000 : 0;
+  }
+  var d = String(a.deadline || '');
+  if (!d) return 0;
+  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d);
+  return m ? new Date(+m[1], +m[2] - 1, +m[3], 23, 59, 59).getTime() : (new Date(d).getTime() || 0);
+}
+function extLocalInput(t) {
+  var d = new Date(t), p = function(n){ return (n < 10 ? '0' : '') + n; };
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+function extFmt(iso) {
+  var d = new Date(iso);
+  return isNaN(d) ? String(iso) : d.toLocaleString('vi-VN', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit', hour12:false });
+}
+function extCurrentMs(a) {   // latest end that applies to the whole class right now
+  return Math.max(extBaseMs(a), a.extAll ? new Date(a.extAll).getTime() : 0);
+}
+
+function extFmtDur(min) {
+  var d = Math.floor(min / 1440), h = Math.floor((min % 1440) / 60), m = min % 60, o = [];
+  if (d) o.push(d + ' ngày'); if (h) o.push(h + ' giờ'); if (m) o.push(m + ' phút');
+  return o.join(' ') || '0 phút';
+}
+function extSetAmount(min) {
+  document.getElementById('extD').value = Math.floor(min / 1440);
+  document.getElementById('extH').value = Math.floor((min % 1440) / 60);
+  document.getElementById('extM').value = min % 60;
+  document.getElementById('extUntil').value = '';
+  renderExtPreview();
+}
+function extAmountMin() {
+  var n = function(id){ return Math.max(0, parseInt(document.getElementById(id).value, 10) || 0); };
+  return n('extD') * 1440 + n('extH') * 60 + n('extM');
+}
+function extScope() { return document.querySelector('input[name="extScope"]:checked').value; }
+function extIsShift() { return EXT.a.mode === 'inclass' && extScope() === 'class' && document.querySelector('input[name="extKind"]:checked').value === 'shift'; }
+
+function renderExtPreview() {
+  var a = EXT.a, isIC = a.mode === 'inclass', box = document.getElementById('extPreview');
+  var abs = document.getElementById('extUntil').value, min = extAmountMin(), shift = extIsShift();
+  document.getElementById('extAbsLabel').textContent = shift ? 'Hoặc chọn giờ bắt đầu mới' : (isIC ? 'Hoặc chọn giờ kết thúc mới' : 'Hoặc chọn hạn nộp mới');
+  if (!abs && !min) { box.textContent = ''; return; }
+  if (extScope() === 'students') {
+    box.textContent = abs ? 'Các SV đã chọn sẽ kết thúc lúc ' + extFmt(abs) : 'Mỗi SV được cộng thêm ' + extFmtDur(min) + ' vào giờ kết thúc hiện tại của chính SV đó.';
+    return;
+  }
+  if (shift) {
+    var st = new Date(a.sessionStart).getTime(), dMs = abs ? new Date(abs).getTime() - st : min * 60000;
+    box.textContent = dMs > 0 ? 'Bắt đầu ' + extFmt(st + dMs) + ' · kết thúc ' + extFmt(extBaseMs(a) + dMs) : 'Giờ bắt đầu mới phải sau giờ hiện tại của bài.';
+    return;
+  }
+  box.textContent = 'Kết thúc mới: ' + extFmt(abs ? new Date(abs).getTime() : Math.max(extCurrentMs(a), Date.now()) + min * 60000);
+}
+
+function openExtendModal(aid) {
+  if (!VM.firebaseOn) { VM.toast('Gia hạn cần bật Firebase (xem gas/FIREBASE_SETUP.md).', 'warn', 5000); return; }
+  var a = state.assignments.find(function(x){ return x.assignmentId === aid; });
+  if (!a) { VM.toast('Không tìm thấy bài.', 'err'); return; }
+  EXT.a = a; EXT.roster = []; EXT.picked = {};
+  var isIC = a.mode === 'inclass';
+  document.getElementById('extTitle').textContent = '⏱ Gia hạn — ' + a.title;
+  document.getElementById('extAmountLabel').textContent = isIC ? 'Thêm thời gian' : 'Gia hạn thêm';
+  document.querySelector('input[name="extScope"][value="class"]').checked = true;
+  document.querySelector('input[name="extKind"][value="shift"]').checked = true;
+  document.getElementById('extKindWrap').style.display = isIC ? '' : 'none';
+  document.getElementById('extStuWrap').style.display = 'none';
+  document.getElementById('extStuSearch').value = '';
+  renderExtInfo();
+
+  var opts = isIC ? [['+5 phút', 5], ['+10 phút', 10], ['+15 phút', 15], ['+30 phút', 30], ['+1 giờ', 60], ['+1 ngày', 1440], ['+1 tuần', 10080]]
+                  : [['+1 giờ', 60], ['+3 giờ', 180], ['+6 giờ', 360], ['+12 giờ', 720], ['+1 ngày', 1440], ['+3 ngày', 4320], ['+7 ngày', 10080]];
+  var q = document.getElementById('extQuick');
+  q.innerHTML = opts.map(function(o){ return '<button type="button" class="vm-btn vm-btn-ghost vm-btn-sm" data-add="' + o[1] + '">' + o[0] + '</button>'; }).join('');
+  VM.els('[data-add]', q).forEach(function(b){ b.onclick = function(){ extSetAmount(parseInt(b.getAttribute('data-add'), 10)); }; });
+  extSetAmount(isIC ? 5 : 1440);
+  renderExtCurrent();
+  document.getElementById('extModal').classList.add('show');
+}
+
+function renderExtInfo() {
+  var a = EXT.a, base = extBaseMs(a);
+  document.getElementById('extInfo').innerHTML =
+    (a.mode === 'inclass' && a.sessionStart ? 'Bắt đầu: <b>' + extFmt(a.sessionStart) + '</b> · ' : '') +
+    (a.mode === 'inclass' ? 'Kết thúc: ' : 'Hạn nộp hiện tại: ') +
+    '<b>' + (base ? extFmt(base) : 'không giới hạn') + '</b>' +
+    (a.extAll ? '<br>Đã gia hạn cả lớp đến: <b>' + extFmt(a.extAll) + '</b>' : '');
+}
+
+function renderExtCurrent() {
+  var a = EXT.a, box = document.getElementById('extCurrent'), rows = [];
+  if (a.extAll) rows.push({ label: 'Cả lớp', until: a.extAll, scope: 'class', sid: '' });
+  Object.keys(a.ext || {}).forEach(function(sid){ if (a.ext[sid]) rows.push({ label: 'SV ' + sid, until: a.ext[sid], scope: 'students', sid: sid }); });
+  if (!rows.length) { box.innerHTML = ''; return; }
+  box.innerHTML = '<div class="vm-label" style="margin-bottom:6px">Gia hạn đang áp dụng</div>' +
+    rows.map(function(r){
+      return '<div style="display:flex;align-items:center;gap:8px;font-size:.84rem;padding:4px 0;border-top:1px solid var(--vm-border)">' +
+        '<span style="flex:1"><b>' + VM.esc(r.label) + '</b> → ' + VM.esc(extFmt(r.until)) + '</span>' +
+        '<button class="vm-btn vm-btn-ghost vm-btn-sm" data-ext-clear="' + VM.esc(r.scope) + '" data-sid="' + VM.esc(r.sid) + '" style="color:var(--vm-danger)">Gỡ</button></div>';
+    }).join('');
+  VM.els('[data-ext-clear]', box).forEach(function(b){
+    b.onclick = function(){
+      var scope = b.getAttribute('data-ext-clear'), sid = b.getAttribute('data-sid');
+      sendExtend({ scope: scope, studentIds: sid ? [sid] : [], clear: true }, 'Đã gỡ gia hạn.');
+    };
+  });
+}
+
+function renderExtStudents() {
+  var qv = (document.getElementById('extStuSearch').value || '').toLowerCase();
+  var list = EXT.roster.filter(function(r){ return !qv || (r.studentId + ' ' + r.name).toLowerCase().indexOf(qv) > -1; });
+  var box = document.getElementById('extStuList');
+  box.innerHTML = list.length ? list.map(function(r){
+    var has = EXT.a.ext && EXT.a.ext[r.studentId];
+    return '<label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer">' +
+      '<input type="checkbox" data-sid="' + VM.esc(r.studentId) + '"' + (EXT.picked[r.studentId] ? ' checked' : '') + '>' +
+      '<span><b>' + VM.esc(r.studentId) + '</b> ' + VM.esc(r.name) + '</span>' +
+      (has ? '<span style="margin-left:auto;font-size:.72rem;color:var(--vm-ok)">⏱ ' + VM.esc(extFmt(has)) + '</span>' : '') + '</label>';
+  }).join('') : '<div style="color:var(--vm-ink-3)">Không có sinh viên.</div>';
+  VM.els('input[data-sid]', box).forEach(function(cb){
+    cb.onchange = function(){ EXT.picked[cb.getAttribute('data-sid')] = cb.checked; };
+  });
+}
+
+function sendExtend(body, okMsg) {
+  body.assignmentId = EXT.a.assignmentId;
+  showOverlay('Đang lưu…');
+  VM.api('assign.extend', body).then(function(res){
+    hideOverlay();
+    if (!res || !res.success) { VM.toast('Lỗi: ' + (res && res.error || 'Unknown'), 'err', 5000); return; }
+    VM.toast(okMsg, 'ok');
+    var id = EXT.a.assignmentId;
+    loadAssignments(function(){
+      if (state.activeTab === 'assign') renderAssignList();
+      var a = state.assignments.find(function(x){ return x.assignmentId === id; });
+      if (a) { EXT.a = a; renderExtInfo(); renderExtCurrent(); renderExtPreview(); if (EXT.roster.length) renderExtStudents(); }
+    });
+  }).catch(function(){ hideOverlay(); VM.toast('Lỗi kết nối.', 'err'); });
+}
+
+document.querySelectorAll('input[name="extScope"]').forEach(function(r){
+  r.onchange = function(){
+    var students = document.querySelector('input[name="extScope"]:checked').value === 'students';
+    document.getElementById('extStuWrap').style.display = students ? '' : 'none';
+    document.getElementById('extKindWrap').style.display = (EXT.a.mode === 'inclass' && !students) ? '' : 'none';
+    renderExtPreview();
+    if (students && !EXT.roster.length) {
+      document.getElementById('extStuList').innerHTML = '<div style="color:var(--vm-ink-3)">Đang tải…</div>';
+      VM.api('class.roster', { classId: EXT.a.classId }).then(function(res){
+        EXT.roster = (res && res.success ? res.data : []) || [];
+        renderExtStudents();
+      });
+    }
+  };
+});
+document.getElementById('extStuSearch').oninput = renderExtStudents;
+document.getElementById('extClose').onclick = document.getElementById('extCancel').onclick = function(){
+  document.getElementById('extModal').classList.remove('show');
+};
+['extD', 'extH', 'extM'].forEach(function(id){
+  document.getElementById(id).oninput = function(){ document.getElementById('extUntil').value = ''; renderExtPreview(); };
+});
+document.getElementById('extUntil').oninput = function(){
+  if (this.value) { ['extD', 'extH', 'extM'].forEach(function(id){ document.getElementById(id).value = 0; }); }
+  renderExtPreview();
+};
+document.querySelectorAll('input[name="extKind"]').forEach(function(r){ r.onchange = renderExtPreview; });
+document.getElementById('extApply').onclick = function(){
+  var scope = extScope(), abs = document.getElementById('extUntil').value, min = extAmountMin(), shift = extIsShift();
+  if (!abs && !min) { VM.toast('Nhập thời gian gia hạn.', 'warn'); return; }
+  var body = { scope: scope, kind: shift ? 'shift' : 'extend' };
+  if (abs) {
+    var t = new Date(abs).getTime();
+    if (!shift && t <= Date.now()) { VM.toast('Thời điểm gia hạn phải ở tương lai.', 'warn'); return; }
+    body.until = new Date(abs).toISOString();
+  } else body.deltaMin = min;
+  if (scope === 'students') {
+    body.studentIds = Object.keys(EXT.picked).filter(function(k){ return EXT.picked[k]; });
+    if (!body.studentIds.length) { VM.toast('Chọn ít nhất 1 sinh viên.', 'warn'); return; }
+  }
+  sendExtend(body, shift ? 'Đã dời lịch kiểm tra.' : (scope === 'class' ? 'Đã gia hạn cho cả lớp.' : 'Đã gia hạn cho ' + body.studentIds.length + ' sinh viên.'));
+};
+
+// Title preview: name is always saved as HW_… / IC_…
+function updateTitleHint() {
+  var t = document.getElementById('af-title').value.trim();
+  var mode = document.getElementById('af-mode').value;
+  document.getElementById('af-title-hint').textContent = t ? 'Tên sẽ được lưu: ' + VM.prefixTitle(t, mode) : 'Tên bài sẽ tự có tiền tố ' + (mode === 'inclass' ? 'IC_' : 'HW_');
+}
+document.addEventListener('input', function(e){ if (e.target.id === 'af-title') updateTitleHint(); });
+document.addEventListener('change', function(e){ if (e.target.id === 'af-mode') updateTitleHint(); });
 
 // ── Assignment Modal ───────────────────────────────────────────────
 function populateClassSelect() {
@@ -714,8 +966,10 @@ function openAssignModal(asgn, defaultMode) {
 
   toggleGoalsField();
   populateHWSourceSelect();
+  updateTitleHint();
   document.getElementById('af-mode').onchange = function(){
     toggleGoalsField();
+    updateTitleHint();
   };
   // Ensure assignments are loaded for HW source dropdown
   if(!state.assignments.length){
@@ -748,6 +1002,7 @@ document.addEventListener('click', function(e){
   // Copy title, reading, vocab from homework into modal
   var titleEl = document.getElementById('af-title');
   if(titleEl && !titleEl.value) titleEl.value = src.title || '';
+  updateTitleHint();
   var readEl = document.getElementById('af-reading');
   if(readEl && !readEl.value) readEl.value = src.reading || '';
   state.vocabRows = (src.vocab||[]).map(function(v){
@@ -929,7 +1184,7 @@ document.getElementById('assignSave').onclick = function(){
   });
 
   var payload = {
-    classId: classId, title: title, mode: mode,
+    classId: classId, title: VM.prefixTitle(title, mode), mode: mode,
     reading: document.getElementById('af-reading').value,
     vocab: state.vocabRows.map(function(r){
       return { word:r.word, ipa:r.ipa||'', synonyms:r.synonyms||[], vi:r.vi||r.meaningVi||'', meaningVi:r.vi||r.meaningVi||'' };
@@ -1458,6 +1713,7 @@ function renderHWBook(){
                 (parseInt(a.requiredGoals,10)||3)+' perfect runs required</td>') +
             '<td style="font-size:.8rem;color:var(--vm-ink-2)">'+submitted+' submitted</td>'+
             '<td style="white-space:nowrap">'+
+              '<button class="vm-btn vm-btn-ghost vm-btn-sm" data-hwb-ext="'+VM.esc(a.assignmentId)+'" style="margin-right:4px">⏱ Extend</button>'+
               '<button class="vm-btn vm-btn-ghost vm-btn-sm" data-hwb-edit="'+VM.esc(a.assignmentId)+'" style="margin-right:4px">Edit</button>'+
               '<button class="vm-btn vm-btn-ghost vm-btn-sm" data-hwb-toggle="'+VM.esc(a.assignmentId)+'" '+
                 'data-hwb-active="'+(a.active==='FALSE'?'false':'true')+'" '+
@@ -1469,6 +1725,9 @@ function renderHWBook(){
           '</tr>';
         }).join('');
 
+        VM.els('[data-hwb-ext]').forEach(function(btn){
+          btn.onclick=function(){ openExtendModal(btn.getAttribute('data-hwb-ext')); };
+        });
         // Edit
         VM.els('[data-hwb-edit]').forEach(function(btn){
           btn.onclick=function(){

@@ -122,7 +122,7 @@ document.getElementById('form').onsubmit=function(e){
   var pw=document.getElementById('pw').value;
   if(!id||!pw){VM.toast('Vui lòng nhập đầy đủ.','err');return;}
   isSub=true; showLoading();
-  VM.api('auth.studentLogin',{studentId:id,password:pw}).then(function(res){
+  VM.api('auth.studentLogin',{studentId:id,password:pw,remember:document.getElementById('rememberMe').checked}).then(function(res){
     if(res&&res.success){
       var r=document.getElementById('rememberMe').checked;
       VM.session.set(Object.assign({role:'student'},res.data),{remember:r});
@@ -146,7 +146,7 @@ document.getElementById('tSubmit').onclick=function(){
   var pw=document.getElementById('tPw').value;
   if(!email||!pw){VM.toast('Nhập email và mật khẩu.','err');return;}
   isTSub=true; showLoading('Đang xác thực giáo viên…');
-  VM.api('auth.teacherLogin',{email:email,password:pw}).then(function(res){
+  VM.api('auth.teacherLogin',{email:email,password:pw,remember:!!(document.getElementById('rememberMe')&&document.getElementById('rememberMe').checked)}).then(function(res){
     if(res&&res.success){
       var rm=document.getElementById('rememberMe');
       VM.session.set(Object.assign({role:'teacher'},res.data),{remember:rm?rm.checked:false});
