@@ -299,7 +299,7 @@
       '<div class="vm-auth-hero-top">' + VM.brandLockup() + '</div>' +
       '<div class="vm-auth-hero-body">' +
         '<span class="vm-auth-tag"><i></i>Vocabulary · Quiz · AI</span>' +
-        '<h2 class="vm-auth-hero-title">Learn.<br>Practice.<br><em>Master.</em></h2>' +
+        '<h2 class="vm-auth-hero-title">Learn. <br>Practice. <br><em>Master.</em></h2>' +
         '<p class="vm-auth-hero-text">' + blurb + '</p>' +
         '<div class="vm-auth-word" aria-hidden="true">' +
           '<div class="vm-auth-word-eyebrow">✦ TODAY\'S WORD</div>' +
@@ -312,7 +312,7 @@
         '<div><b>HW</b><span>Homework</span></div>' +
         '<div><b>IC</b><span>In-class</span></div>' +
         '<div><b>AI</b><span>ReadWise</span></div>' +
-        '<div><b>&infin;</b><span>Luyện lại</span></div>' +
+        '<div><b>&infin;</b><span>Retry</span></div>' +
       '</div>';
     wrap.insertBefore(h, wrap.firstChild);
   };
@@ -360,7 +360,7 @@
             '<button class="vm-menu-btn" id="vmMenuBtn">'+VM.icon('menu')+'</button>'+
             '<div><div class="vm-eyebrow">'+(opts.eyebrow||'')+'</div>'+
             '<h1 class="vm-page-title" id="vmPageTitle">'+(opts.title||'')+'</h1></div>'+
-            '<div class="vm-topbar-right"><div class="vm-user">'+
+            '<div class="vm-topbar-right"><button class="vm-top-logout" id="vmLogout2" title="Sign out" aria-label="Sign out">'+VM.icon('logout')+'</button><div class="vm-user">'+
               '<div class="vm-avatar">'+ini+'</div>'+
               '<div><div class="vm-user-name">'+VM.esc(name)+'</div><div class="vm-user-role">'+role+'</div></div>'+
             '</div></div>'+
@@ -369,6 +369,7 @@
         '</div>'+
       '</div>';
     document.getElementById('vmLogout').onclick = function(){ VM.session.logout(); };
+    document.getElementById('vmLogout2').onclick = function(){ VM.session.logout(); };
     // Idle check
     var warned = false;
     setInterval(function(){
