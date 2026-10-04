@@ -1320,7 +1320,9 @@ function renderResults() {
     RS.classId      = cls;
     RS.assignmentId = document.getElementById('rsAssign').value;
     RS.mode         = document.getElementById('rsMode').value;
-    RS.days         = parseInt(document.getElementById('rsDays').value,10)||14;
+    // "All time" has value 0 — `||14` used to turn it into 14 days, hiding every older result
+    RS.days         = parseInt(document.getElementById('rsDays').value,10);
+    if(isNaN(RS.days)) RS.days = 14;
     RS.page         = page || 1;
     RS.loading      = true;
 
