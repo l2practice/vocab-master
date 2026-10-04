@@ -536,3 +536,36 @@ function vmfb_91_VocabBank() {
   fsCommit(writes);
   return vmfbLog('Từ vựng: ' + words.length + ' từ trong ' + (writes.length - 1) + ' tài liệu.');
 }
+
+// ════════════════════════════════════════════════════════════
+// SOI MỘT BÀI: đổi VMFB_FIND ở dưới thành một phần tên bài (VD 'Thylacines'), chạy
+// vmfb_find_Assignment rồi gửi Execution log. Cho biết bài đó trong Sheet / Firebase,
+// và các tài liệu kết quả gắn với nó (lớp, GV, SV, mode).
+// ════════════════════════════════════════════════════════════
+var VMFB_FIND = 'Thylacines';
+function vmfb_find_Assignment() {
+  var q = VMFB_FIND.toLowerCase(), out = [], ids = {};
+  out.push('— Lớp trên Firebase —');
+  fsQuery('classes', []).forEach(function (c) { out.push(c._id + ' | ' + c.className + ' | teacherUid=' + c.teacherUid + ' | ' + c.status); });
+  out.push('— Bài trong Sheet —');
+  readAll(T.ASSIGN).forEach(function (r) {
+    if (String(r['Title']).toLowerCase().indexOf(q) < 0) return;
+    var n = 0; try { n = JSON.parse(r['Vocab List'] || '[]').length; } catch (e) {}
+    ids[vmfbStr(r['Assignment ID'])] = 1;
+    out.push(vmfbStr(r['Assignment ID']) + ' | ' + r['Mode'] + ' | lớp=' + r['Class'] + ' | ' + n + ' từ | Active=' + r['Active'] + ' | ' + r['Title']);
+  });
+  out.push('— Bài trên Firebase —');
+  fsQuery('assignments', []).forEach(function (a) {
+    if (String(a.title).toLowerCase().indexOf(q) < 0) return;
+    ids[a._id] = 1;
+    out.push(a._id + ' | ' + a.mode + ' | classId=' + a.classId + ' | teacherUid=' + a.teacherUid + ' | active=' + a.active + ' deleted=' + a.deleted + ' | ' + a.title);
+  });
+  out.push('— Kết quả trên Firebase gắn với các bài trên —');
+  var n = 0;
+  fsQuery('results', []).forEach(function (d) {
+    if (!ids[d.assignmentId]) return;
+    n++; if (n <= 40) out.push(d._id + ' | mode=' + d.mode + ' | classId=' + d.classId + ' | teacherUid=' + d.teacherUid + ' | SV=' + d.studentId + ' | ' + (d.runs || []).length + ' lượt');
+  });
+  out.push('Tổng ' + n + ' tài liệu kết quả (hiện tối đa 40).');
+  return vmfbLog(out.join('\n'));
+}
