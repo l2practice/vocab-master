@@ -1231,6 +1231,7 @@ function renderResults() {
 
   /* ── State ──────────────────────────────────── */
   var RS = {
+    fromResults:  {},
     classId:      '',
     assignmentId: '',
     mode:         '',
@@ -1288,7 +1289,12 @@ function renderResults() {
     var keep = sel.value;
     // only assignments of the chosen class AND mode (a Homework can never match an In-class filter)
     // RS.allAssign also holds closed/deleted assignments: their results still exist and must be pickable
-    var src = RS.allAssign || state.assignments;
+    var src = (RS.allAssign || state.assignments).slice();
+    // plus assignments known only from their results (no longer in the assignment list)
+    var have = {}; src.forEach(function(a){ have[a.assignmentId] = 1; });
+    (RS.fromResults[cls] || []).forEach(function(r){
+      if(!have[r.assignmentId]) src.push({ assignmentId:r.assignmentId, title:r.title, mode:r.mode, classId:cls, active:'FALSE', deleted:true });
+    });
     var list = src.filter(function(a){ return (!cls || a.classId===cls) && (!mode || a.mode===mode); });
     sel.innerHTML = '<option value="">All assignments</option>'+
       list.map(function(a){
@@ -1304,6 +1310,13 @@ function renderResults() {
   document.getElementById('rsCls').onchange = function(){
     RS.page = 1;
     refreshAssignDropdown();
+    var cls = document.getElementById('rsCls').value;
+    if(cls && !RS.fromResults[cls]){
+      VM.api('result.assignments', { classId: cls }).then(function(res){
+        RS.fromResults[cls] = (res && res.success && res.data) ? res.data : [];
+        refreshAssignDropdown();
+      }).catch(function(){});
+    }
   };
   document.getElementById('rsMode').onchange = function(){
     RS.page = 1;

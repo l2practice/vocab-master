@@ -500,6 +500,27 @@ async function resultGetForStudent() {
   return ok(rows);
 }
 
+function classResultDocs(t, classId, assignmentId) {
+  return memo('res|' + t.uid + '|' + classId + '|' + str(assignmentId), 30000, async () => {
+    let q = fs.collection('results').where('teacherUid', '==', t.uid).where('classId', '==', classId);
+    if (assignmentId) q = q.where('assignmentId', '==', assignmentId);
+    return docs(await q.get());
+  });
+}
+// Every assignment of a class that has at least one result — straight from the results, so the
+// Results dropdown can offer assignments that are gone from the assignment list.
+async function resultAssignments(p) {
+  const t = await teacher();
+  if (!p.classId) return fail('classId required');
+  const rows = await classResultDocs(t, str(p.classId), '');
+  const by = {};
+  rows.forEach(d => {
+    const a = by[d.assignmentId] || (by[d.assignmentId] = { assignmentId: d.assignmentId, title: d.title || d.assignmentId, mode: d.mode || '', students: 0, last: '' });
+    a.students++; if (str(d.lastAt) > a.last) a.last = str(d.lastAt);
+  });
+  return ok(Object.keys(by).map(k => by[k]).sort((a, b) => b.last.localeCompare(a.last)));
+}
+
 async function resultGetForTeacher(p) {
   const t = await teacher();
   if (!p.classId) return fail('classId required');
@@ -519,11 +540,7 @@ async function resultGetForTeacher(p) {
   const page = Math.max(1, parseInt(p.page, 10) || 1);
 
   // Whole class is fetched once, then paged/filtered in memory (30 s cache while the teacher pages through)
-  const rows = await memo('res|' + t.uid + '|' + classId + '|' + str(p.assignmentId) + '|' + days, 30000, async () => {
-    let q = fs.collection('results').where('teacherUid', '==', t.uid).where('classId', '==', classId);
-    if (p.assignmentId) q = q.where('assignmentId', '==', p.assignmentId);
-    return docs(await q.get());
-  });
+  const rows = await classResultDocs(t, classId, p.assignmentId);
   const groups = rows.filter(d => (!p.mode || d.mode === p.mode) && (!cutoff || ms(d.lastAt) >= cutoff)).map(d => {
     const runs = d.runs || [];
     let best = 0, last = null;
@@ -796,7 +813,7 @@ const ACTIONS = {
   'assign.create': assignCreate, 'assign.update': assignUpdate, 'assign.delete': assignDelete,
   'assign.list': assignList, 'assign.get': assignGet, 'assign.forStudent': assignForStudent, 'assign.extend': assignExtend,
   'result.save': p => resultSave(p), 'result.saveInclass': resultSaveInclass,
-  'result.getForTeacher': resultGetForTeacher, 'result.getForStudent': resultGetForStudent,
+  'result.getForTeacher': resultGetForTeacher, 'result.assignments': resultAssignments, 'result.getForStudent': resultGetForStudent,
   'result.missedWords': resultMissedWords, 'result.absentPenalty': absentPenalty,
   'result.recheckSave': recheckSave, 'result.recheckList': recheckList,
   'translate.create': translateCreate, 'translate.update': translateUpdate, 'translate.list': translateList,
