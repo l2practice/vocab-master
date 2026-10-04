@@ -1287,10 +1287,13 @@ function renderResults() {
     var mode = document.getElementById('rsMode').value;
     var keep = sel.value;
     // only assignments of the chosen class AND mode (a Homework can never match an In-class filter)
-    var list = state.assignments.filter(function(a){ return (!cls || a.classId===cls) && (!mode || a.mode===mode); });
+    // RS.allAssign also holds closed/deleted assignments: their results still exist and must be pickable
+    var src = RS.allAssign || state.assignments;
+    var list = src.filter(function(a){ return (!cls || a.classId===cls) && (!mode || a.mode===mode); });
     sel.innerHTML = '<option value="">All assignments</option>'+
       list.map(function(a){
-        return '<option value="'+VM.esc(a.assignmentId)+'">'+VM.esc(a.title)+'</option>';
+        var tag = a.deleted ? ' (deleted)' : (a.active==='FALSE' ? ' (closed)' : '');
+        return '<option value="'+VM.esc(a.assignmentId)+'">'+VM.esc(a.title+tag)+'</option>';
       }).join('');
     if(keep && list.some(function(a){ return a.assignmentId===keep; })) sel.value = keep;   // else back to "All assignments"
   }
@@ -1312,6 +1315,14 @@ function renderResults() {
   } else {
     loadAssignments(refreshAssignDropdown);
   }
+  // full list (incl. closed/deleted) for the dropdown
+  (function(){
+    var cids = state.classes.map(function(c){ return c.classId; });
+    if(!cids.length) return;
+    VM.api('assign.list', { classIds: cids, includeDeleted: true }).then(function(res){
+      if(res && res.success){ RS.allAssign = res.data || []; refreshAssignDropdown(); }
+    });
+  })();
 
   /* ── Load data ───────────────────────────────── */
   function load(page){

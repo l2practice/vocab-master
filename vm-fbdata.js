@@ -281,7 +281,7 @@ function teacherRow(id, d) {
     sessionStart: d.sessionStart || '', sessionDurationMin: parseInt(d.sessionDurationMin, 10) || 0,
     sessionEnd: d.sessionEnd || '', createdAt: d.createdAt, active: activeStr(d),
     // time extensions (whole class + per student) — shown/edited in the teacher's Extend dialog
-    extAll: d.extAll || '', ext: d.ext || {}
+    extAll: d.extAll || '', ext: d.ext || {}, deleted: !!d.deleted
   };
 }
 
@@ -343,7 +343,7 @@ async function assignList(p) {
   const t = await teacher();
   const ids = p.classId ? [p.classId] : (p.classIds || null);
   const rows = docs(await fs.collection('assignments').where('teacherUid', '==', t.uid).get())
-    .filter(d => !d.deleted && (!ids || ids.indexOf(d.classId) > -1))
+    .filter(d => (p.includeDeleted || !d.deleted) && (!ids || ids.indexOf(d.classId) > -1))   // includeDeleted: Results dropdown still needs deleted/closed assignments whose results exist
     .sort((a, b) => str(b.createdAt).localeCompare(str(a.createdAt)));
   return ok(rows.map(d => teacherRow(d._id, d)));
 }
