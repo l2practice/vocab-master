@@ -4,7 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%231B7F5E'/%3E%3Ctext x='12' y='17' text-anchor='middle' font-size='13' font-weight='700' fill='%23fff' font-family='system-ui'%3EV%3C/text%3E%3C/svg%3E">
 <meta name="theme-color" content="#1B7F5E">
-<title>Đăng nhập · VocabMaster</title>
+<title>VocabMaster</title>
 <link rel="stylesheet" href="vm-theme.css">
 <style>
 .vm-modal-bg{position:fixed;inset:0;background:rgba(13,79,58,.45);z-index:500;display:none;align-items:center;justify-content:center;padding:20px}
@@ -23,7 +23,7 @@
     <div class="vm-auth-head">
       <div id="brand" style="display:flex;justify-content:center"></div>
       <h1 class="vm-auth-title">Welcome back</h1>
-      <p class="vm-auth-sub">Đăng nhập để luyện từ vựng.</p>
+      <p class="vm-auth-sub">Sign in to practise your vocabulary.</p>
     </div>
 
     <form id="form" autocomplete="on">
@@ -95,7 +95,7 @@ if (typeof VM === 'undefined') {
   throw new Error('no VM');
 }
 document.getElementById('brand').innerHTML = VM.brandLockup();
-VM.mountAuthHero('Làm bài từ vựng theo lớp, xem lại từ sai sau mỗi lượt và để AI phân tích bài đọc của riêng bạn.');
+VM.mountAuthHero('Practise your class vocabulary, review the words you missed after every attempt, and let AI break down your own reading texts.');
 
 // Already logged in?
 (function(){ var s=VM.session.get(); if(s&&s.role) location.href=s.role==='teacher'?VM.TEACHER_HOME:VM.STUDENT_HOME; })();
