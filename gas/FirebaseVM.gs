@@ -536,3 +536,29 @@ function vmfb_91_VocabBank() {
   fsCommit(writes);
   return vmfbLog('Từ vựng: ' + words.length + ' từ trong ' + (writes.length - 1) + ' tài liệu.');
 }
+
+// ════════════════════════════════════════════════════════════
+// KIỂM TRA SAU KHI CHUYỂN: Sheet có bao nhiêu kết quả, Firebase có bao nhiêu.
+// Chạy vmfb_check_Results rồi xem Execution log.
+// ════════════════════════════════════════════════════════════
+function vmfb_check_Results() {
+  var owner = vmfbClassOwners_(), users = vmfbStudentMap_(owner), alias = vmfbJson(PropertiesService.getScriptProperties().getProperty('vmfb_alias'), {});
+  var rows = readAll(T.RESULTS), modes = {}, pairs = {}, noUser = 0, noMode = 0;
+  rows.forEach(function (r) {
+    var m = vmfbStr(r['Mode']) || '(trống)'; modes[m] = (modes[m] || 0) + 1;
+    var sid = vmfbStr(r['Student ID']), a0 = vmfbStr(r['Assignment ID']);
+    if (!sid || !a0) return;
+    if (!users[sid]) { noUser++; return; }
+    pairs[m + '|' + (alias[a0] || a0) + '|' + sid] = 1;
+  });
+  var expected = {}; Object.keys(pairs).forEach(function (k) { var m = k.split('|')[0]; expected[m] = (expected[m] || 0) + 1; });
+  var docs = fsQuery('results', []), have = {}, noTeacher = 0, noClass = 0;
+  docs.forEach(function (d) { var m = d.mode || '(trống)'; have[m] = (have[m] || 0) + 1; if (!d.teacherUid) noTeacher++; if (!d.classId) noClass++; });
+  var out = ['Dòng trong Sheet theo mode: ' + JSON.stringify(modes),
+             'Tài liệu (SV × bài) lẽ ra có: ' + JSON.stringify(expected),
+             'Tài liệu đang có trên Firebase: ' + JSON.stringify(have),
+             'Dòng của SV không còn trong Students: ' + noUser,
+             'Tài liệu thiếu teacherUid: ' + noTeacher + ', thiếu classId: ' + noClass,
+             'Con trỏ vmfb_6 còn dở (0 = đã xong): ' + vmfbCursor('res')];
+  return vmfbLog(out.join('\n'));
+}
