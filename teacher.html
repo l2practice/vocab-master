@@ -1284,17 +1284,25 @@ function renderResults() {
     var sel = document.getElementById('rsAssign');
     if(!sel) return;
     var cls = document.getElementById('rsCls').value;
-    var list = state.assignments.filter(function(a){ return !cls || a.classId===cls; });
+    var mode = document.getElementById('rsMode').value;
+    var keep = sel.value;
+    // only assignments of the chosen class AND mode (a Homework can never match an In-class filter)
+    var list = state.assignments.filter(function(a){ return (!cls || a.classId===cls) && (!mode || a.mode===mode); });
     sel.innerHTML = '<option value="">All assignments</option>'+
       list.map(function(a){
         return '<option value="'+VM.esc(a.assignmentId)+'">'+VM.esc(a.title)+'</option>';
       }).join('');
+    if(keep && list.some(function(a){ return a.assignmentId===keep; })) sel.value = keep;   // else back to "All assignments"
   }
 
   // Hide the tab-switch overlay immediately — results load on demand
   hideOverlay();
 
   document.getElementById('rsCls').onchange = function(){
+    RS.page = 1;
+    refreshAssignDropdown();
+  };
+  document.getElementById('rsMode').onchange = function(){
     RS.page = 1;
     refreshAssignDropdown();
   };
