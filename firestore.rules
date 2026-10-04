@@ -13,6 +13,9 @@ service cloud.firestore {
     function owns(data)  { return isTeacher() && data.teacherUid == request.auth.uid; }
     function profile()   { return get(/databases/$(db)/documents/users/$(request.auth.uid)).data; }
     function classOwned(cid) { return get(/databases/$(db)/documents/classes/$(cid)).data.teacherUid == request.auth.uid; }
+    // Reading a document that does not exist yet (resource == null) must not error out:
+    // the app checks "does this id exist?" before creating, and first-time progress reads.
+    function missing()   { return signedIn() && resource == null; }
     function unchanged(f) {
       return request.resource.data.get(f, null) == resource.data.get(f, null);
     }
@@ -43,6 +46,7 @@ service cloud.firestore {
     // Bài tập: ID do trình duyệt tạo, mỗi bài đúng MỘT tài liệu.
     // extAll / ext{studentId} = gia hạn cho cả lớp / từng SV (chỉ GV ghi được).
     match /assignments/{id} {
+      allow get: if missing();
       allow read: if owns(resource.data)
                   || (signedIn() && resource.data.classId == profile().classId);
       allow create: if isTeacher() && request.resource.data.teacherUid == request.auth.uid
@@ -55,6 +59,7 @@ service cloud.firestore {
     // MỘT tài liệu cho mỗi (SV × bài): runs[] của mọi lần làm. SV ghi bài của mình;
     // lớp và GV phải khớp hồ sơ. GV ghi được cho SV lớp mình (đánh vắng).
     match /results/{id} {
+      allow get: if missing();
       allow read: if (signedIn() && resource.data.uid == request.auth.uid) || owns(resource.data);
       allow create: if (isMe(request.resource.data.uid)
                         && request.resource.data.classId == profile().classId
@@ -68,6 +73,7 @@ service cloud.firestore {
 
     // Dấu "đã chép phạt / re-check" của GV
     match /rechecks/{id} {
+      allow get: if missing();
       allow read: if owns(resource.data);
       allow create: if isTeacher() && request.resource.data.teacherUid == request.auth.uid;
       allow update: if owns(resource.data) && unchanged('teacherUid');
@@ -76,6 +82,7 @@ service cloud.firestore {
 
     // Translate
     match /trSets/{id} {
+      allow get: if missing();
       allow read: if owns(resource.data)
                   || (signedIn() && resource.data.classId == profile().classId);
       allow create: if isTeacher() && request.resource.data.teacherUid == request.auth.uid
@@ -84,6 +91,7 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /trProgress/{id} {
+      allow get: if missing();
       allow read: if (signedIn() && resource.data.uid == request.auth.uid) || owns(resource.data);
       allow create: if isMe(request.resource.data.uid)
                     && request.resource.data.classId == profile().classId
@@ -94,6 +102,7 @@ service cloud.firestore {
 
     // ReadWise: bài đọc tự học, chỉ chủ bài thấy
     match /readwise/{id} {
+      allow get: if missing();
       allow read, delete: if signedIn() && resource.data.uid == request.auth.uid;
       allow create: if isMe(request.resource.data.uid);
       allow update: if false;
