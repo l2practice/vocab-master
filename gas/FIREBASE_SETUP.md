@@ -61,6 +61,7 @@ Sau khi ổn định vài tuần, nên **xoá cột Password trong tab Students/
   - **Homework, cả lớp hoặc từng SV**: cộng giờ + ngày (+1 giờ … +7 ngày) vào hạn nộp. Bài quá hạn vẫn hiện cho SV được gia hạn. Bài không có hạn nộp thì không cần gia hạn.
   - Phép cộng tính từ mốc hiện tại của chính đối tượng đó (hoặc từ bây giờ nếu mốc đã qua).
   - Hạn nộp dạng ngày (`2026-10-05`) nay tính đến **hết ngày đó** (trước đây hết hạn lúc 7h sáng).
+  - **Bài Dịch (Translate)** cũng có nút ⏱ Extend ở tab Dịch: gia hạn hạn nộp cho cả lớp hoặc từng SV, cùng cách tính với Homework. (Gia hạn Homework không tự áp dụng cho bài Dịch được tạo từ nó, vì bài Dịch có hạn riêng.)
   - Cần bật Firebase (bản Sheet cũ không có tính năng này).
 
 ## Dữ liệu trên Firestore

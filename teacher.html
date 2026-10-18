@@ -784,9 +784,12 @@ function renderExtPreview() {
   box.textContent = 'Kết thúc mới: ' + extFmt(abs ? new Date(abs).getTime() : Math.max(extCurrentMs(a), Date.now()) + min * 60000);
 }
 
-function openExtendModal(aid) {
+// A Translate set looks like a homework to the dialog: its deadline can be extended, class-wide or per student
+function trAsExt(s){ return { assignmentId:s.setId, mode:'homework', title:'Dịch · '+s.title, classId:s.classId, deadline:s.deadline||'', extAll:s.extAll||'', ext:s.ext||{}, _tr:true }; }
+
+function openExtendModal(aid, tr) {
   if (!VM.firebaseOn) { VM.toast('Gia hạn cần bật Firebase (xem gas/FIREBASE_SETUP.md).', 'warn', 5000); return; }
-  var a = state.assignments.find(function(x){ return x.assignmentId === aid; });
+  var a = tr || state.assignments.find(function(x){ return x.assignmentId === aid; });
   if (!a) { VM.toast('Không tìm thấy bài.', 'err'); return; }
   EXT.a = a; EXT.roster = []; EXT.picked = {};
   var isIC = a.mode === 'inclass';
@@ -854,13 +857,22 @@ function renderExtStudents() {
 }
 
 function sendExtend(body, okMsg) {
-  body.assignmentId = EXT.a.assignmentId;
+  var isTr = !!EXT.a._tr;
+  if (isTr) body.setId = EXT.a.assignmentId; else body.assignmentId = EXT.a.assignmentId;
   showOverlay('Đang lưu…');
-  VM.api('assign.extend', body).then(function(res){
+  VM.api(isTr ? 'translate.extend' : 'assign.extend', body).then(function(res){
     hideOverlay();
     if (!res || !res.success) { VM.toast('Lỗi: ' + (res && res.error || 'Unknown'), 'err', 5000); return; }
     VM.toast(okMsg, 'ok');
     var id = EXT.a.assignmentId;
+    if (isTr) {
+      VM.api('translate.list', {}).then(function(r){
+        var s = ((r && r.success && r.data) || []).find(function(x){ return x.setId === id; });
+        if (s) { EXT.a = trAsExt(s); renderExtInfo(); renderExtCurrent(); renderExtPreview(); if (EXT.roster.length) renderExtStudents(); }
+        if (state.activeTab === 'translate') renderTranslate();
+      });
+      return;
+    }
     loadAssignments(function(){
       if (state.activeTab === 'assign') renderAssignList();
       var a = state.assignments.find(function(x){ return x.assignmentId === id; });
@@ -2065,7 +2077,8 @@ function renderTranslate(){
                 '<td style="font-size:.8rem">'+fmtDeadline(s.sessionStart)+'</td>'+
                 '<td style="font-size:.8rem">'+fmtDeadline(s.deadline)+'</td>'+
                 '<td>'+(String(s.active).toUpperCase()==='TRUE'?'✅':'❌')+'</td>'+
-                '<td><button class="vm-btn vm-btn-ghost vm-btn-sm" data-tr-stats="'+VM.esc(s.setId)+'">Stats</button>'+
+                '<td><button class="vm-btn vm-btn-ghost vm-btn-sm" data-tr-ext="'+VM.esc(s.setId)+'">⏱ Extend</button> '+
+                  '<button class="vm-btn vm-btn-ghost vm-btn-sm" data-tr-stats="'+VM.esc(s.setId)+'">Stats</button>'+
                   ' <button class="vm-btn vm-btn-ghost vm-btn-sm" data-tr-toggle="'+VM.esc(s.setId)+'" '+
                     'style="color:'+(String(s.active).toUpperCase()==='TRUE'?'var(--vm-danger)':'var(--vm-ok)')+'">'+
                     (String(s.active).toUpperCase()==='TRUE'?'Close':'Reopen')+'</button>'+
@@ -2075,6 +2088,13 @@ function renderTranslate(){
             '<div class="vm-empty"><p>Chưa có bài dịch. Tạo từ Homework có sẵn.</p></div>')+
           '<div id="trStatsWrap" style="margin-top:18px"></div>';
 
+        // Extend (deadline, whole class or chosen students)
+        VM.els('[data-tr-ext]').forEach(function(btn){
+          btn.onclick=function(){
+            var s=sets.find(function(x){return x.setId===btn.getAttribute('data-tr-ext');});
+            if(s) openExtendModal(null, trAsExt(s));
+          };
+        });
         // Stats button
         VM.els('[data-tr-stats]').forEach(function(btn){
           btn.onclick=function(){ loadTrStats(btn.getAttribute('data-tr-stats')); };

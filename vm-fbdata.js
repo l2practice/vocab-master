@@ -407,12 +407,14 @@ function shiftStr(v, dMs) {
   if (!v || !t) return v;
   return /(?:[zZ]|[+-]\d{2}:\d{2})$/.test(v) ? new Date(t + dMs).toISOString() : localInput(t + dMs);
 }
-async function assignExtend(p) {
+const assignExtend = p => (p.assignmentId ? extendDoc('assignments/' + p.assignmentId, p) : Promise.resolve(fail('Thiếu assignmentId.')));
+// Translate sets use the same extAll / ext{studentId} fields on their deadline
+const translateExtend = p => (p.setId ? extendDoc('trSets/' + p.setId, p) : Promise.resolve(fail('Missing setId.')));
+async function extendDoc(path, p) {
   const t = await teacher();
-  if (!p.assignmentId) return fail('Thiếu assignmentId.');
-  const ref = fs.doc('assignments/' + p.assignmentId);
+  const ref = fs.doc(path);
   const snap = await ref.get();
-  if (!snap.exists || snap.data().teacherUid !== t.uid) return fail('Không tìm thấy assignment.');
+  if (!snap.exists || snap.data().teacherUid !== t.uid) return fail('Không tìm thấy bài.');
   const d = snap.data(), inclass = d.mode === 'inclass', now = Date.now();
   const FP = firebase.firestore.FieldPath;
   const sids = (p.studentIds || []).map(str).filter(Boolean);
@@ -627,13 +629,16 @@ async function recheckList(p) {
 // ════════════════════════════════════════════
 // TRANSLATE
 // ════════════════════════════════════════════
-function trStatus(d) {
-  const start = ms(d.sessionStart), dl = deadlineMs(d.deadline), now = Date.now();
+// effective end for one student: the deadline, or a later class-wide / personal extension
+function trEnd(d, sid) { const dl = deadlineMs(d.deadline); return dl ? Math.max(dl, extFor(d, sid)) : 0; }
+function trStatus(d, sid) {
+  const start = ms(d.sessionStart), end = trEnd(d, sid), now = Date.now();
   if (!start) return 'open';
   if (now < start) return 'upcoming';
-  if (dl && now > dl) return 'closed';
+  if (end && now > end) return 'closed';
   return 'open';
 }
+function trDeadlineFor(d, sid) { const dl = deadlineMs(d.deadline), e = trEnd(d, sid); return dl && e > dl ? localStamp(e) : (d.deadline || ''); }
 async function translateCreate(p) {
   const t = await teacher();
   if (!p.classId || !str(p.title) || !p.sessionStart) return fail('Missing classId, title, or sessionStart.');
@@ -671,7 +676,8 @@ async function translateList(p) {
     .sort((a, b) => str(b.createdAt).localeCompare(str(a.createdAt)));
   return ok(rows.map(d => ({
     setId: d._id, sourceAssignmentId: d.sourceAssignmentId, classId: d.classId, title: d.title, passScore: d.passScore || 85,
-    sessionStart: d.sessionStart, deadline: d.deadline, createdAt: d.createdAt, active: d.active === false ? 'FALSE' : 'TRUE', itemCount: d.itemCount || 0
+    sessionStart: d.sessionStart, deadline: d.deadline, createdAt: d.createdAt, active: d.active === false ? 'FALSE' : 'TRUE', itemCount: d.itemCount || 0,
+    extAll: d.extAll || '', ext: d.ext || {}
   })));
 }
 async function translateForStudent() {
@@ -680,17 +686,17 @@ async function translateForStudent() {
   const rows = docs(await fs.collection('trSets').where('classId', '==', u.classId).where('active', '==', true).get());
   return ok(rows.map(d => ({
     setId: d._id, sourceAssignmentId: d.sourceAssignmentId, title: d.title, passScore: d.passScore || 85,
-    sessionStart: d.sessionStart, deadline: d.deadline, itemCount: d.itemCount || 30, sessionStatus: trStatus(d)
+    sessionStart: d.sessionStart, deadline: trDeadlineFor(d, u.studentId), extended: trEnd(d, u.studentId) > deadlineMs(d.deadline), itemCount: d.itemCount || 30, sessionStatus: trStatus(d, u.studentId)
   })));
 }
 async function translateGet(p) {
   if (!p.setId) return fail('Missing setId.');
-  await me();
+  const u = await me();
   const s = await fs.doc('trSets/' + p.setId).get();
   if (!s.exists) return fail('Set not found.');
   const d = s.data();
-  return ok({ setId: s.id, title: d.title, passScore: d.passScore || 85, sessionStart: d.sessionStart, deadline: d.deadline,
-             classId: d.classId, items: json(d.itemsJson, []), sessionStatus: trStatus(d) });
+  return ok({ setId: s.id, title: d.title, passScore: d.passScore || 85, sessionStart: d.sessionStart, deadline: trDeadlineFor(d, u.studentId),
+             classId: d.classId, items: json(d.itemsJson, []), sessionStatus: trStatus(d, u.studentId) });
 }
 async function translateSaveResult(p) {
   const u = await me();
@@ -816,7 +822,7 @@ const ACTIONS = {
   'result.getForTeacher': resultGetForTeacher, 'result.assignments': resultAssignments, 'result.getForStudent': resultGetForStudent,
   'result.missedWords': resultMissedWords, 'result.absentPenalty': absentPenalty,
   'result.recheckSave': recheckSave, 'result.recheckList': recheckList,
-  'translate.create': translateCreate, 'translate.update': translateUpdate, 'translate.list': translateList,
+  'translate.create': translateCreate, 'translate.extend': translateExtend, 'translate.update': translateUpdate, 'translate.list': translateList,
   'translate.forStudent': translateForStudent, 'translate.get': translateGet, 'translate.saveResult': translateSaveResult,
   'translate.stats': translateStats, 'translate.myProgress': translateMyProgress,
   'readwise.save': readwiseSave, 'readwise.list': readwiseList, 'readwise.get': readwiseGet, 'readwise.delete': readwiseDelete,
