@@ -563,7 +563,8 @@ button,.vm-btn,.vm-nav,.vm-tab,.vm-opt,.vm-rw-opt,.vm-page-btn{cursor:pointer}
   .vm-pt-top #ptClose{order:2}
   .vm-pt-top #ptSkip{order:3;padding:7px 12px!important}
   .vm-pt-start{order:4;flex:1 1 100%;min-width:0!important;padding:10px 14px!important}
-  .vm-pt-body{flex-direction:column!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch;gap:12px;padding:10px 10px calc(14px + env(safe-area-inset-bottom))}
+  .vm-pt-body{padding:10px 10px calc(14px + env(safe-area-inset-bottom))!important}
+  .vm-pt-row{flex-direction:column!important;gap:12px!important}
   .vm-pt-pass,.vm-pt-vocab{flex:none!important;overflow:visible!important;margin:0!important;padding:16px 16px!important;border-radius:var(--vm-r)!important}
   .vm-pt-pass{max-height:none}
   /* each vocabulary row becomes a small card: word + IPA, then synonym, then Vietnamese */
@@ -576,3 +577,73 @@ button,.vm-btn,.vm-nav,.vm-tab,.vm-opt,.vm-rw-opt,.vm-page-btn{cursor:pointer}
   .vm-pt-vocab td:nth-child(3){grid-column:1/-1}
   .vm-pt-vocab td:nth-child(4){grid-column:1/-1;font-size:.98rem}
 }
+
+/*──────── Text Profile (CEFR) — study screen ────────
+  Series colours #D4664F (tokens) and #4F6BD8 (types) passed the dataviz colour-blind check in LisDictation. */
+.tp{--tp-tok:#D4664F;--tp-typ:#4F6BD8;margin-top:22px;padding-top:16px;border-top:2px solid var(--vm-border);font-family:var(--vm-font-body);color:var(--vm-ink)}
+.tp-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.tp-head h3{margin:0;font-size:1.05rem}
+.tp-body.hidden{display:none}
+.tp-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:16px}
+.tp-tile{background:var(--vm-surface-2);border-radius:16px;padding:12px 14px}
+.tp-label{font-size:12px;font-weight:600;color:var(--vm-ink-3)}
+.tp-value{font-size:1.4rem;font-weight:600;letter-spacing:-.02em;color:var(--vm-ink);line-height:1.25;margin-top:2px}
+.tp-sub{font-size:12px;color:var(--vm-ink-2)}
+.tp-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:20px}
+@media(min-width:1500px){.tp-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.tp-h{font-size:14px;font-weight:600;margin:0 0 8px;color:var(--vm-ink)}
+.tp-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--vm-ink-2);margin-bottom:8px}
+.tp-legend span{display:inline-flex;align-items:center;gap:6px}
+.tp-key{width:12px;height:12px;border-radius:3px;display:inline-block}
+.tp-key.tok,.tp-bar.tok,.tp-line.tok{background:var(--tp-tok)}
+.tp-key.typ,.tp-bar.typ,.tp-line.typ{background:var(--tp-typ)}
+.tp-chart{position:relative;display:flex;gap:6px;height:220px;padding-bottom:24px}
+.tp-yaxis{display:flex;flex-direction:column;justify-content:space-between;font-size:11px;color:var(--vm-ink-3);font-variant-numeric:tabular-nums;text-align:right;min-width:30px;margin:-6px 0}
+.tp-plot{position:relative;flex:1;display:flex;align-items:stretch;border-bottom:1px solid var(--vm-border)}
+.tp-grid-line{position:absolute;left:0;right:0;height:1px;background:var(--vm-border-2)}
+.tp-group{position:relative;flex:1;display:flex;flex-direction:column;align-items:center;outline:none;border-radius:8px;cursor:default}
+.tp-group.hot,.tp-group:focus-visible{background:rgba(51,38,26,.06)}
+.tp-bars{flex:1;width:100%;display:flex;align-items:flex-end;justify-content:center;gap:2px}
+.tp-bar{position:relative;width:min(40%,22px);border-radius:4px 4px 0 0;min-height:1px}
+.tp-cap{position:absolute;bottom:100%;left:50%;transform:translateX(-50%);margin-bottom:3px;font-size:11px;font-weight:600;color:var(--vm-ink-2);white-space:nowrap}
+.tp-x{position:absolute;bottom:-22px;font-size:12px;font-weight:600;color:var(--vm-ink-2);white-space:nowrap}
+.tp-tip{position:absolute;top:0;width:180px;pointer-events:none;opacity:0;transition:opacity .12s;background:var(--vm-surface);border:1px solid var(--vm-border);border-radius:12px;box-shadow:var(--vm-shadow);padding:8px 10px;font-size:12px;z-index:3}
+.tp-tip.on{opacity:1}
+.tp-tip-h{font-weight:600;color:var(--vm-ink-2);margin-bottom:4px}
+.tp-tip-row{display:flex;align-items:center;gap:6px;color:var(--vm-ink-2)}
+.tp-tip-row b{color:var(--vm-ink);min-width:34px}
+.tp-line{width:12px;height:3px;border-radius:2px;display:inline-block}
+.tp-table{margin-top:10px;font-size:12.5px}
+.tp-table summary{cursor:pointer;color:var(--vm-ink-2);font-weight:600}
+.tp-tscroll{overflow-x:auto}
+.tp-tbl{width:100%;border-collapse:collapse}
+.tp-tbl th,.tp-tbl td{padding:8px 5px;vertical-align:top}
+.tp-tbl thead th{color:var(--vm-ink);text-align:center}
+.tp-tbl tbody th{font-size:12px;color:var(--vm-ink-2);font-weight:600;text-align:left;min-width:64px;border-bottom:1px solid var(--vm-border-2)}
+.tp-tbl td{font-variant-numeric:tabular-nums;text-align:center}
+.tp-tbl td b{display:block;color:var(--vm-ink)}
+.tp-tbl td small{color:var(--vm-ink-3);font-size:11.5px}
+.tp-ex{color:var(--vm-ink-3);font-size:11.5px;line-height:1.45}
+.tp-note{font-size:12px;color:var(--vm-ink-3);margin:8px 0 0}
+.tp-summary ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.tp-summary li{position:relative;font-size:.88rem;line-height:1.55;color:var(--vm-ink-2)}
+.tp-li-h{display:block;color:var(--vm-ink);font-size:.82rem;margin-bottom:1px}
+.tp-word{border:1px solid var(--vm-border);background:var(--vm-surface-2);border-radius:var(--vm-r-pill);padding:3px 10px;margin:2px 2px 2px 0;font:inherit;font-weight:600;font-size:.82rem;color:var(--vm-ink);cursor:pointer}
+.tp-word small{color:var(--vm-ink-3);font-weight:600;font-size:.7rem}
+.tp-word:hover{background:var(--vm-primary-lt);border-color:var(--vm-primary)}
+.tp-pop{position:relative;margin-top:8px;max-width:340px;background:var(--vm-surface);border:1px solid var(--vm-border);border-radius:14px;box-shadow:var(--vm-shadow);padding:12px 14px;font-size:.86rem;color:var(--vm-ink-2)}
+.tp-pop-x{position:absolute;top:6px;right:8px;border:none;background:none;color:var(--vm-ink-3);cursor:pointer;font-size:.9rem}
+.tp-pop-w{font-weight:700;font-size:1.05rem;color:var(--vm-ink)}
+.tp-pop-w span{font-size:.7rem;font-weight:700;background:var(--vm-primary-lt);color:var(--vm-primary-dk);border-radius:var(--vm-r-pill);padding:2px 8px;margin-left:4px}
+.tp-pop-m{font-size:.78rem;color:var(--vm-ink-3)}
+.tp-pop-i{font-family:monospace;font-size:.8rem}
+.tp-pop-v{color:var(--vm-primary);font-weight:700}
+
+/* Study screen: passage | vocabulary side by side, Text Profile full width below both */
+@media(min-width:761px){
+  .vm-pt-vocab{position:sticky;top:0;max-height:calc(100vh - 100px);overflow-y:auto}
+}
+.vm-pt-prof .tp{margin-top:12px;padding:20px 24px;border-top:none;background:var(--vm-surface);border-radius:var(--vm-r-lg)}
+@media(min-width:900px){.vm-pt-prof .tp-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(min-width:1000px){.vm-pt-prof .tp-grid{grid-template-columns:minmax(0,1.3fr) minmax(0,1fr)}}
+@media(max-width:760px){.vm-pt-prof .tp{padding:16px}}

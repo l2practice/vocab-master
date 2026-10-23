@@ -139,8 +139,9 @@
 <div id="app"></div>
 
 <script src="vm-common.js"></script>
-<script src="cefr-dict.js"></script>
+<script src="cefr-dict.js?v=2"></script>
 <script src="vm-cefr.js"></script>
+<script src="vm-textprofile.js?v=1"></script>
 <script>
 if (typeof VM === 'undefined') { location.href='login.html'; throw new Error('no VM'); }
 var sess = VM.session.require('student');
@@ -414,12 +415,13 @@ function showPretestModal(asgn, onStart) {
       '<button id="ptClose" style="background:rgba(255,255,255,.08);border:none;color:rgba(255,255,255,.85);width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:16px;flex-shrink:0">✕</button>'+
     '</div>'+
     // Body: passage left, vocab right
-    '<div class="vm-pt-body" style="flex:1;display:flex;overflow:hidden">'+
-      '<div class="vm-pt-pass" style="flex:1.2;overflow-y:auto;padding:22px 26px;background:var(--vm-surface);margin:12px 0 12px 12px;border-radius:var(--vm-r-lg)">'+
+    '<div class="vm-pt-body" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px">'+
+     '<div class="vm-pt-row" style="display:flex;gap:12px;align-items:flex-start">'+
+      '<div class="vm-pt-pass" style="flex:1.2;min-width:0;padding:22px 26px;background:var(--vm-surface);border-radius:var(--vm-r-lg)">'+
         '<div style="font-family:var(--vm-font-display);font-size:1.05rem;font-weight:700;color:var(--vm-ink);margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid var(--vm-accent)">📖 Reading Passage</div>'+
         '<div style="font-family:var(--vm-font-essay);font-size:1.02rem;color:var(--vm-ink)">'+passHtml+'</div>'+
       '</div>'+
-      '<div class="vm-pt-vocab" style="flex:1;overflow-y:auto;padding:22px 20px;background:var(--vm-surface);margin:12px;border-radius:var(--vm-r-lg)">'+
+      '<div class="vm-pt-vocab" style="flex:1;min-width:0;padding:22px 20px;background:var(--vm-surface);border-radius:var(--vm-r-lg)">'+
         '<div style="font-family:var(--vm-font-display);font-size:1.05rem;font-weight:700;color:var(--vm-ink);margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid var(--vm-accent)">📚 Vocabulary to Study</div>'+
         '<div style="overflow-x:auto">'+
         '<table style="width:100%;border-collapse:collapse;font-size:.9rem">'+
@@ -432,9 +434,15 @@ function showPretestModal(asgn, onStart) {
           '<tbody>'+vocabRows+'</tbody>'+
         '</table></div>'+
       '</div>'+
+     '</div>'+
+     // Text Profile: full width, below the passage and the vocabulary panel
+     '<div id="tpMount" class="vm-pt-prof"></div>'+
     '</div>';
 
   document.body.appendChild(el);
+
+  // Text Profile (CEFR) under the passage — computed locally, no AI call
+  try { if(window.VMTP && passage) VMTP.mount(document.getElementById('tpMount'), passage, vocab); } catch(e){ console.warn('text profile', e); }
 
   // Timer
   var remaining = SECS;
