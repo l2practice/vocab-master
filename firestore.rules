@@ -108,6 +108,16 @@ service cloud.firestore {
       allow update: if false;
     }
 
+    // Peer Comparison: số lần làm và số lần đạt 100% của cả lớp, MỘT tài liệu mỗi lớp (id = classId).
+    // SV trong lớp đọc được và cộng dồn phần của mình; không chứa điểm số.
+    match /classStats/{cid} {
+      allow get: if missing();
+      allow read: if signedIn() && (profile().classId == cid || (isTeacher() && classOwned(cid)));
+      allow create, update: if signedIn() && profile().classId == cid
+                            && request.resource.data.keys().hasOnly(['a', 'updatedAt']);
+      allow delete: if false;
+    }
+
     // Từ của ngày: ai đăng nhập cũng đọc; chỉ Apps Script ghi
     match /vocabBank/{id} {
       allow read: if signedIn();

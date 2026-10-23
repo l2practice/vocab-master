@@ -536,3 +536,32 @@ function vmfb_91_VocabBank() {
   fsCommit(writes);
   return vmfbLog('Từ vựng: ' + words.length + ' từ trong ' + (writes.length - 1) + ' tài liệu.');
 }
+
+// ════════════════════════════════════════════════════════════
+// Bước 10 — Peer Comparison: dựng lại classStats/{lớp} từ các tài liệu results đã có trên Firebase
+// (số lần làm + số lần đạt 100% của từng SV theo từng bài; KHÔNG chứa điểm).
+// Chạy 1 lần sau vmfb_6_Results. Chạy lại an toàn: chỉ ghi đè phần của từng bài (a.<mã bài>).
+// ════════════════════════════════════════════════════════════
+function vmfb_10_ClassStats() {
+  var byClass = {}, n = 0;
+  fsQuery('results', []).forEach(function (d) {
+    if ((d.mode !== 'homework' && d.mode !== 'inclass') || !d.classId) return;
+    var runs = (d.runs || []).filter(function (r) { return !r.absent; });
+    if (!runs.length) return;
+    var perfect = runs.filter(function (r) { return r.perfect; }).length, last = '';
+    runs.forEach(function (r) { if (String(r.t) > last) last = String(r.t); });
+    var cls = byClass[d.classId] = byClass[d.classId] || {};
+    var a = cls[d.assignmentId] = cls[d.assignmentId] || { title: d.title || '', mode: d.mode, last: '', total: 0, perfect: 0, students: {} };
+    a.total += runs.length; a.perfect += perfect; if (last > a.last) a.last = last;
+    a.students[d.uid] = { name: d.name || d.studentId || '', count: runs.length, perfect: perfect, last: last };
+    n++;
+  });
+  var writes = [];
+  Object.keys(byClass).forEach(function (cid) {
+    var ids = Object.keys(byClass[cid]);
+    var mask = ids.map(function (id) { return 'a.' + fp(id); }); mask.push('updatedAt');
+    writes.push(wMerge('classStats/' + cid, { a: byClass[cid], updatedAt: new Date().toISOString() }, mask));
+  });
+  fsCommit(writes);
+  return vmfbLog('Peer Comparison: ' + n + ' dòng (SV × bài) của ' + writes.length + ' lớp.');
+}

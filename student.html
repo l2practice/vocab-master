@@ -169,6 +169,7 @@ VM.renderShell({
     {id:'inclass', label:'In-class',      icon:'inclass'},
     {id:'reading', label:'ReadWise',      icon:'reading'},
     {id:'history',  label:'History',       icon:'results'},
+    {id:'peer',     label:'Peers',         icon:'classes'},
     {id:'translate', label:'Dịch',          icon:'reading'},
     {id:'settings', label:'Settings',      icon:'edit'},
   ],
@@ -178,7 +179,7 @@ VM.renderShell({
 function switchTab(id){
   S.activeTab=id;
   VM.setActiveNav(id);
-  var titles={home:'Home',homework:'Homework',inclass:'In-class Review',reading:'ReadWise',translate:'Luyện Dịch',history:'History',settings:'Settings'};
+  var titles={home:'Home',homework:'Homework',inclass:'In-class Review',reading:'ReadWise',translate:'Luyện Dịch',history:'History',peer:'Peer Comparison',settings:'Settings'};
   VM.setTitle(titles[id]||id);
   var c=document.getElementById('vmContent');
   c.innerHTML='<div class="vm-empty" style="padding:40px"><span class="vm-spin-dark" style="width:22px;height:22px;border-width:3px"></span></div>';
@@ -188,6 +189,7 @@ function switchTab(id){
   else if(id==='reading')  renderReadWise();
   else if(id==='settings') renderSettings();
   else if(id==='translate') renderTranslateList();
+  else if(id==='peer') renderPeers();
   else if(id==='history'){
     // Pre-load assignments so retry buttons work
     if(!S.assignments.length) loadAssignments(function(){ renderHistory(); });
@@ -1366,6 +1368,64 @@ function openRWQuiz(art){
 
 /* ── History ──────────────────────────────────── */
 var _histGroups = {}; // map expandId → group, for lazy-load
+/* ── Peer Comparison: how many times classmates practised, and how many runs were 100% (no scores) ── */
+var _peer = { days:14, mode:'', open:{}, shown:{} };
+function renderPeers(){
+  var c=document.getElementById('vmContent');
+  VM.api('peer.get',{sinceDays:_peer.days,mode:_peer.mode}).then(function(res){
+    if(!res||!res.success){ c.innerHTML='<div class="vm-empty"><p>'+VM.esc((res&&res.error)||'Could not load.')+'</p></div>'; return; }
+    var list=res.data||[];
+    var chips=[['','All'],['homework','📝 Homework'],['inclass','🖥️ In-class']].map(function(m){
+      return '<button class="vm-tab'+(_peer.mode===m[0]?' active':'')+'" data-peer-mode="'+m[0]+'">'+m[1]+'</button>';
+    }).join('');
+    c.innerHTML=
+      '<div style="font-size:.86rem;color:var(--vm-ink-2);margin-bottom:4px">'+VM.esc(res.className||'')+'</div>'+
+      '<p style="font-size:.9rem;color:var(--vm-ink-2);margin:0 0 14px">See how many times your classmates practised each assignment, and how many of those runs were 100%.</p>'+
+      '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px">'+
+        '<div class="vm-tabs" style="margin:0">'+chips+'</div>'+
+        '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="peerDays">'+(_peer.days?'Last 2 weeks · show all time':'All time · show last 2 weeks')+'</button>'+
+      '</div>'+
+      (list.length?'<div class="vm-assign-grid" style="grid-template-columns:repeat(auto-fill,minmax(340px,1fr))">'+list.map(function(t,i){
+        var me=t.me||{count:0,perfect:0};
+        var tile=function(v,l){ return '<div style="background:var(--vm-surface-2);border-radius:14px;padding:10px 6px;text-align:center"><div style="font-size:1.35rem;font-weight:700;line-height:1.2">'+v+'</div><div style="font-size:.66rem;font-weight:600;color:var(--vm-ink-3);text-transform:uppercase;letter-spacing:.04em">'+l+'</div></div>'; };
+        return '<div class="vm-assign-card" style="cursor:default" data-peer-card="'+i+'">'+
+          '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">'+
+            '<div class="vm-assign-card-title">'+VM.esc(t.title)+'</div>'+
+            '<span style="font-size:.7rem;font-weight:700;color:var(--vm-primary-dk);background:var(--vm-primary-lt);border-radius:999px;padding:3px 10px;white-space:nowrap">'+(t.mode==='inclass'?'In-class':'Homework')+'</span>'+
+          '</div>'+
+          '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">'+tile(t.peerCount,'classmates')+tile(t.total,'total tries')+tile(t.perfect,'× 100%')+'</div>'+
+          '<div style="font-size:.84rem;color:var(--vm-ink-2)">You: <b style="color:var(--vm-ink)">'+me.count+'</b> '+(me.count===1?'try':'tries')+' · <b style="color:var(--vm-ok)">'+me.perfect+'</b> × 100%</div>'+
+          '<div id="peerBoard'+i+'"></div>'+
+          '<button class="vm-btn vm-btn-ghost vm-btn-sm" data-peer-board="'+i+'">'+(_peer.open[t.assignmentId]?'Hide leaderboard':'Show leaderboard')+'</button>'+
+        '</div>';
+      }).join('')+'</div>':'<div class="vm-empty"><p>'+(_peer.days?'No practice in the last 2 weeks.':'No practice in your class yet.')+'</p></div>');
+
+    function board(i){
+      var t=list[i], box=document.getElementById('peerBoard'+i); if(!box) return;
+      if(!_peer.open[t.assignmentId]){ box.innerHTML=''; return; }
+      var n=_peer.shown[t.assignmentId]||10, rows=t.members.slice(0,n);
+      box.innerHTML='<div style="font-size:.68rem;font-weight:700;color:var(--vm-ink-3);text-transform:uppercase;letter-spacing:.05em;margin:2px 0 6px">Leaderboard ('+rows.length+' of '+t.members.length+')</div>'+
+        rows.map(function(m,k){
+          return '<div style="display:flex;align-items:center;gap:8px;font-size:.88rem;padding:5px 8px;border-radius:10px;'+(m.isMe?'background:var(--vm-primary-lt);font-weight:700':'')+'">'+
+            '<span style="width:20px;text-align:right;color:var(--vm-ink-3);font-size:.76rem">'+(k+1)+'.</span>'+
+            '<span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+VM.esc(m.name)+(m.isMe?' <span style="font-size:.64rem;background:var(--vm-primary);color:#fff;border-radius:999px;padding:1px 7px">You</span>':'')+'</span>'+
+            '<span style="font-weight:700;min-width:34px;text-align:right">'+m.count+'×</span>'+
+            '<span style="font-size:.74rem;font-weight:700;color:'+(m.perfect?'var(--vm-ok)':'var(--vm-ink-3)')+';min-width:58px;text-align:right">'+m.perfect+' × 100%</span>'+
+          '</div>';
+        }).join('')+
+        (n<t.members.length?'<button class="vm-btn vm-btn-ghost vm-btn-sm" style="margin-top:6px;width:100%" data-peer-more="'+i+'">Show '+Math.min(10,t.members.length-n)+' more</button>':'');
+      var more=box.querySelector('[data-peer-more]');
+      if(more) more.onclick=function(){ _peer.shown[t.assignmentId]=n+10; board(i); };
+    }
+    VM.els('[data-peer-mode]').forEach(function(b){ b.onclick=function(){ _peer.mode=b.getAttribute('data-peer-mode'); renderPeers(); }; });
+    var d=document.getElementById('peerDays'); if(d) d.onclick=function(){ _peer.days=_peer.days?0:14; renderPeers(); };
+    VM.els('[data-peer-board]').forEach(function(b){
+      var i=parseInt(b.getAttribute('data-peer-board'),10); board(i);
+      b.onclick=function(){ var id=list[i].assignmentId; _peer.open[id]=!_peer.open[id]; b.textContent=_peer.open[id]?'Hide leaderboard':'Show leaderboard'; board(i); };
+    });
+  }).catch(function(){ c.innerHTML='<div class="vm-empty"><p>Connection error.</p></div>'; });
+}
+
 function renderHistory(){
   showOverlay('Loading history…');
   loadMyResults(function(){

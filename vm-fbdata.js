@@ -482,16 +482,48 @@ async function resultSave(p, forceMode) {
     t: now, score, perfect, dur: Number(p.durationSec) || 0, correct: Number(p.correct) || 0, total: Number(p.total) || 0,
     missed: p.missedWords || [], timedOut: !!p.timedOut, absent: false
   };
-  await fs.doc('results/' + p.assignmentId + '_' + u.uid).set({
+  const mode = forceMode || p.mode || '';
+  const batch = fs.batch();
+  batch.set(fs.doc('results/' + p.assignmentId + '_' + u.uid), {
     uid: u.uid, studentId: u.studentId || '', name: u.fullName || '', classId: u.classId || '', teacherUid: u.teacherUid || '',
-    assignmentId: p.assignmentId, title: p.title || '', mode: forceMode || p.mode || '',
+    assignmentId: p.assignmentId, title: p.title || '', mode,
     attempts: FV.increment(1), perfectCount: FV.increment(perfect ? 1 : 0), lastAt: now,
     runs: FV.arrayUnion(run)
   }, { merge: true });
+  // Peer Comparison: one small doc per class (classStats) so a student reads ONE doc to see how many times
+  // classmates practised and how many 100% runs they got — never their scores.
+  if (u.classId && (mode === 'homework' || mode === 'inclass')) {
+    batch.set(fs.doc('classStats/' + u.classId), {
+      a: { [p.assignmentId]: {
+        title: p.title || '', mode, last: now, total: FV.increment(1), perfect: FV.increment(perfect ? 1 : 0),
+        students: { [u.uid]: { name: u.fullName || u.studentId || '', count: FV.increment(1), perfect: FV.increment(perfect ? 1 : 0), last: now } }
+      } },
+      updatedAt: now
+    }, { merge: true });
+  }
+  await batch.commit();
   forget('res|');
   return ok();
 }
 const resultSaveInclass = p => resultSave(p, 'inclass');
+
+// Peer Comparison — attempts and 100% runs of classmates per assignment (no scores)
+async function peerGet(p) {
+  const u = await me();
+  if (!u.classId) return { success: true, data: [], className: '' };
+  const [d, cls] = await Promise.all([fs.doc('classStats/' + u.classId).get(), fs.doc('classes/' + u.classId).get()]);
+  const a = (d.exists && d.data().a) || {};
+  const cutoff = Number(p.sinceDays) > 0 ? Date.now() - Number(p.sinceDays) * 86400000 : 0;
+  const list = Object.keys(a).map(id => {
+    const t = a[id], st = t.students || {};
+    const members = Object.keys(st).map(uid => ({ name: st[uid].name || '—', count: st[uid].count || 0, perfect: st[uid].perfect || 0, isMe: uid === u.uid }))
+      .sort((x, y) => (y.count - x.count) || (y.perfect - x.perfect) || x.name.localeCompare(y.name));
+    return { assignmentId: id, title: t.title || id, mode: t.mode || '', last: t.last || '', total: t.total || 0, perfect: t.perfect || 0,
+             peerCount: members.length, members, me: members.filter(m => m.isMe)[0] || null };
+  }).filter(t => (!p.mode || t.mode === p.mode) && (!cutoff || ms(t.last) >= cutoff))
+    .sort((x, y) => str(y.last).localeCompare(str(x.last)));
+  return { success: true, data: list, className: cls.exists ? (cls.data().className || u.classId) : u.classId };
+}
 
 async function resultGetForStudent() {
   const u = await me();
@@ -819,7 +851,7 @@ const ACTIONS = {
   'assign.create': assignCreate, 'assign.update': assignUpdate, 'assign.delete': assignDelete,
   'assign.list': assignList, 'assign.get': assignGet, 'assign.forStudent': assignForStudent, 'assign.extend': assignExtend,
   'result.save': p => resultSave(p), 'result.saveInclass': resultSaveInclass,
-  'result.getForTeacher': resultGetForTeacher, 'result.assignments': resultAssignments, 'result.getForStudent': resultGetForStudent,
+  'peer.get': peerGet, 'result.getForTeacher': resultGetForTeacher, 'result.assignments': resultAssignments, 'result.getForStudent': resultGetForStudent,
   'result.missedWords': resultMissedWords, 'result.absentPenalty': absentPenalty,
   'result.recheckSave': recheckSave, 'result.recheckList': recheckList,
   'translate.create': translateCreate, 'translate.extend': translateExtend, 'translate.update': translateUpdate, 'translate.list': translateList,
