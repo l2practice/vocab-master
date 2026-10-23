@@ -563,7 +563,8 @@ button,.vm-btn,.vm-nav,.vm-tab,.vm-opt,.vm-rw-opt,.vm-page-btn{cursor:pointer}
   .vm-pt-top #ptClose{order:2}
   .vm-pt-top #ptSkip{order:3;padding:7px 12px!important}
   .vm-pt-start{order:4;flex:1 1 100%;min-width:0!important;padding:10px 14px!important}
-  .vm-pt-body{flex-direction:column!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch;gap:12px;padding:10px 10px calc(14px + env(safe-area-inset-bottom))}
+  .vm-pt-body{padding:10px 10px calc(14px + env(safe-area-inset-bottom))!important}
+  .vm-pt-row{flex-direction:column!important;gap:12px!important}
   .vm-pt-pass,.vm-pt-vocab{flex:none!important;overflow:visible!important;margin:0!important;padding:16px 16px!important;border-radius:var(--vm-r)!important}
   .vm-pt-pass{max-height:none}
   /* each vocabulary row becomes a small card: word + IPA, then synonym, then Vietnamese */
@@ -637,3 +638,12 @@ button,.vm-btn,.vm-nav,.vm-tab,.vm-opt,.vm-rw-opt,.vm-page-btn{cursor:pointer}
 .tp-pop-m{font-size:.78rem;color:var(--vm-ink-3)}
 .tp-pop-i{font-family:monospace;font-size:.8rem}
 .tp-pop-v{color:var(--vm-primary);font-weight:700}
+
+/* Study screen: passage | vocabulary side by side, Text Profile full width below both */
+@media(min-width:761px){
+  .vm-pt-vocab{position:sticky;top:0;max-height:calc(100vh - 100px);overflow-y:auto}
+}
+.vm-pt-prof .tp{margin-top:12px;padding:20px 24px;border-top:none;background:var(--vm-surface);border-radius:var(--vm-r-lg)}
+@media(min-width:900px){.vm-pt-prof .tp-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(min-width:1000px){.vm-pt-prof .tp-grid{grid-template-columns:minmax(0,1.3fr) minmax(0,1fr)}}
+@media(max-width:760px){.vm-pt-prof .tp{padding:16px}}
