@@ -36,6 +36,7 @@ Cho tới khi bật công tắc (bước D), app vẫn chạy bằng Google Shee
 | `vmfb_8_Translate` | Bài Luyện Dịch và kết quả |
 | `vmfb_9_ReadWise` | Bài đọc tự học của SV |
 | `vmfb_91_VocabBank` | Danh sách "Today's word" |
+| `vmfb_10_ClassStats` | **Peer Comparison:** dựng số liệu "số lần làm / số lần đạt 100%" của cả lớp từ kết quả đã chuyển. Chạy sau `vmfb_6_Results`. |
 
 - Chạy lại bước nào cũng an toàn: tài liệu đã có trên Firebase **không bị ghi đè**.
 - Google Sheet không bị sửa; nó được giữ làm bản sao lưu.
@@ -86,3 +87,8 @@ Giới hạn mỗi ngày: 50.000 lượt đọc, 20.000 lượt ghi, 20.000 lư�
 ## Giới hạn đã biết
 - Đổi **email** của SV trong Roster chỉ cập nhật hồ sơ; đăng nhập bằng email vẫn theo email lúc đăng ký (đăng nhập bằng Student ID luôn đúng).
 - Thời gian In-class do trình duyệt SV kiểm tra (như bản cũ); chưa chặn nộp muộn ở phía máy chủ.
+
+## Peer Comparison (tab Peers của SV)
+- Chỉ thống kê **Homework** (In-class không có). Mỗi bài Homework hiện: số bạn đã làm, tổng số lần làm, số lần đạt 100%, và bảng xếp hạng (tên, số lần, số lần 100%). **Không hiện điểm** của bạn.
+- Dữ liệu nằm trong **một tài liệu cho mỗi lớp** (`classStats/{classId}`), SV chỉ đọc 1 tài liệu cho cả tab; mỗi lần nộp bài được cộng thêm vào đó.
+- Cần dán lại `firestore.rules` (thêm quy tắc `classStats`) và chạy `vmfb_10_ClassStats` một lần để có số liệu của các bài cũ.
