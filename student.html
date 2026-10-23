@@ -1372,17 +1372,13 @@ var _histGroups = {}; // map expandId → group, for lazy-load
 var _peer = { days:14, mode:'', open:{}, shown:{} };
 function renderPeers(){
   var c=document.getElementById('vmContent');
-  VM.api('peer.get',{sinceDays:_peer.days,mode:_peer.mode}).then(function(res){
+  VM.api('peer.get',{sinceDays:_peer.days}).then(function(res){
     if(!res||!res.success){ c.innerHTML='<div class="vm-empty"><p>'+VM.esc((res&&res.error)||'Could not load.')+'</p></div>'; return; }
     var list=res.data||[];
-    var chips=[['','All'],['homework','📝 Homework'],['inclass','🖥️ In-class']].map(function(m){
-      return '<button class="vm-tab'+(_peer.mode===m[0]?' active':'')+'" data-peer-mode="'+m[0]+'">'+m[1]+'</button>';
-    }).join('');
     c.innerHTML=
       '<div style="font-size:.86rem;color:var(--vm-ink-2);margin-bottom:4px">'+VM.esc(res.className||'')+'</div>'+
-      '<p style="font-size:.9rem;color:var(--vm-ink-2);margin:0 0 14px">See how many times your classmates practised each assignment, and how many of those runs were 100%.</p>'+
+      '<p style="font-size:.9rem;color:var(--vm-ink-2);margin:0 0 14px">See how many times your classmates practised each homework, and how many of those runs were 100%.</p>'+
       '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px">'+
-        '<div class="vm-tabs" style="margin:0">'+chips+'</div>'+
         '<button class="vm-btn vm-btn-ghost vm-btn-sm" id="peerDays">'+(_peer.days?'Last 2 weeks · show all time':'All time · show last 2 weeks')+'</button>'+
       '</div>'+
       (list.length?'<div class="vm-assign-grid" style="grid-template-columns:repeat(auto-fill,minmax(340px,1fr))">'+list.map(function(t,i){
@@ -1391,7 +1387,6 @@ function renderPeers(){
         return '<div class="vm-assign-card" style="cursor:default" data-peer-card="'+i+'">'+
           '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">'+
             '<div class="vm-assign-card-title">'+VM.esc(t.title)+'</div>'+
-            '<span style="font-size:.7rem;font-weight:700;color:var(--vm-primary-dk);background:var(--vm-primary-lt);border-radius:999px;padding:3px 10px;white-space:nowrap">'+(t.mode==='inclass'?'In-class':'Homework')+'</span>'+
           '</div>'+
           '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">'+tile(t.peerCount,'classmates')+tile(t.total,'total tries')+tile(t.perfect,'× 100%')+'</div>'+
           '<div style="font-size:.84rem;color:var(--vm-ink-2)">You: <b style="color:var(--vm-ink)">'+me.count+'</b> '+(me.count===1?'try':'tries')+' · <b style="color:var(--vm-ok)">'+me.perfect+'</b> × 100%</div>'+
@@ -1417,7 +1412,6 @@ function renderPeers(){
       var more=box.querySelector('[data-peer-more]');
       if(more) more.onclick=function(){ _peer.shown[t.assignmentId]=n+10; board(i); };
     }
-    VM.els('[data-peer-mode]').forEach(function(b){ b.onclick=function(){ _peer.mode=b.getAttribute('data-peer-mode'); renderPeers(); }; });
     var d=document.getElementById('peerDays'); if(d) d.onclick=function(){ _peer.days=_peer.days?0:14; renderPeers(); };
     VM.els('[data-peer-board]').forEach(function(b){
       var i=parseInt(b.getAttribute('data-peer-board'),10); board(i);

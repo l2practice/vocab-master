@@ -538,14 +538,14 @@ function vmfb_91_VocabBank() {
 }
 
 // ════════════════════════════════════════════════════════════
-// Bước 10 — Peer Comparison: dựng lại classStats/{lớp} từ các tài liệu results đã có trên Firebase
+// Bước 10 — Peer Comparison (chỉ Homework): dựng lại classStats/{lớp} từ các tài liệu results đã có trên Firebase
 // (số lần làm + số lần đạt 100% của từng SV theo từng bài; KHÔNG chứa điểm).
 // Chạy 1 lần sau vmfb_6_Results. Chạy lại an toàn: chỉ ghi đè phần của từng bài (a.<mã bài>).
 // ════════════════════════════════════════════════════════════
 function vmfb_10_ClassStats() {
   var byClass = {}, n = 0;
   fsQuery('results', []).forEach(function (d) {
-    if ((d.mode !== 'homework' && d.mode !== 'inclass') || !d.classId) return;
+    if (d.mode !== 'homework' || !d.classId) return;   // Peer Comparison: chỉ Homework
     var runs = (d.runs || []).filter(function (r) { return !r.absent; });
     if (!runs.length) return;
     var perfect = runs.filter(function (r) { return r.perfect; }).length, last = '';

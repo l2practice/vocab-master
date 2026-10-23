@@ -89,6 +89,6 @@ Giới hạn mỗi ngày: 50.000 lượt đọc, 20.000 lượt ghi, 20.000 lư�
 - Thời gian In-class do trình duyệt SV kiểm tra (như bản cũ); chưa chặn nộp muộn ở phía máy chủ.
 
 ## Peer Comparison (tab Peers của SV)
-- Hiện mỗi bài Homework / In-class: số bạn đã làm, tổng số lần làm, số lần đạt 100%, và bảng xếp hạng (tên, số lần, số lần 100%). **Không hiện điểm** của bạn.
+- Chỉ thống kê **Homework** (In-class không có). Mỗi bài Homework hiện: số bạn đã làm, tổng số lần làm, số lần đạt 100%, và bảng xếp hạng (tên, số lần, số lần 100%). **Không hiện điểm** của bạn.
 - Dữ liệu nằm trong **một tài liệu cho mỗi lớp** (`classStats/{classId}`), SV chỉ đọc 1 tài liệu cho cả tab; mỗi lần nộp bài được cộng thêm vào đó.
 - Cần dán lại `firestore.rules` (thêm quy tắc `classStats`) và chạy `vmfb_10_ClassStats` một lần để có số liệu của các bài cũ.

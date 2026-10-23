@@ -492,7 +492,7 @@ async function resultSave(p, forceMode) {
   }, { merge: true });
   // Peer Comparison: one small doc per class (classStats) so a student reads ONE doc to see how many times
   // classmates practised and how many 100% runs they got — never their scores.
-  if (u.classId && (mode === 'homework' || mode === 'inclass')) {
+  if (u.classId && mode === 'homework') {   // Peer Comparison covers Homework only
     batch.set(fs.doc('classStats/' + u.classId), {
       a: { [p.assignmentId]: {
         title: p.title || '', mode, last: now, total: FV.increment(1), perfect: FV.increment(perfect ? 1 : 0),
@@ -520,7 +520,7 @@ async function peerGet(p) {
       .sort((x, y) => (y.count - x.count) || (y.perfect - x.perfect) || x.name.localeCompare(y.name));
     return { assignmentId: id, title: t.title || id, mode: t.mode || '', last: t.last || '', total: t.total || 0, perfect: t.perfect || 0,
              peerCount: members.length, members, me: members.filter(m => m.isMe)[0] || null };
-  }).filter(t => (!p.mode || t.mode === p.mode) && (!cutoff || ms(t.last) >= cutoff))
+  }).filter(t => t.mode === 'homework' && (!cutoff || ms(t.last) >= cutoff))
     .sort((x, y) => str(y.last).localeCompare(str(x.last)));
   return { success: true, data: list, className: cls.exists ? (cls.data().className || u.classId) : u.classId };
 }
