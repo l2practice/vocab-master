@@ -1430,8 +1430,6 @@ function renderResults() {
         '<td>'+(r.mode==='homework'?'📝':'🖥️')+' <span style="font-size:.78rem">'+VM.esc(r.mode)+'</span></td>'+
         '<td><b style="color:'+scoreCol+'">'+r.bestScore+'%</b>'+
           (r.bestScore!==r.lastScore?'<span style="font-size:.72rem;color:var(--vm-ink-3);margin-left:4px">last:'+r.lastScore+'%</span>':'')+
-          (r.mode==='inclass'&&r.lastMissed&&r.lastMissed.length?
-            '<div style="font-size:.7rem;color:#7A5000;margin-top:2px;max-width:200px;white-space:normal">⚠️ '+r.lastMissed.map(VM.esc).join(', ')+'</div>':'')+
         '</td>'+
         '<td style="text-align:center">'+r.attempts+'</td>'+
         '<td>'+
