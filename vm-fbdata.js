@@ -563,9 +563,22 @@ async function resultGetForTeacher(p) {
   // Flat mode: the runs of one student × assignment (accordion expand) — a single doc read
   if (p.groupBy === 'all') {
     if (!p.studentId || !p.assignmentId) return ok([]);
-    const d = await fs.doc('results/' + p.assignmentId + '_' + await uidForStudent(p.studentId)).get();
-    if (!d.exists) return ok([]);
-    return ok((d.data().runs || []).slice().sort((a, b) => ms(b.t) - ms(a.t)).slice(0, 20).map(runToRow));
+    // Look the doc up by its stored studentId (exact, then trimmed/case-insensitive via the class docs) —
+    // hashing the id only works when it matches the id the account was created with.
+    const sid = str(p.studentId).trim();
+    let data = null;
+    const q = await fs.collection('results').where('teacherUid', '==', t.uid).where('assignmentId', '==', p.assignmentId).where('studentId', '==', sid).get();
+    if (!q.empty) data = q.docs[0].data();
+    if (!data) {
+      const d = await fs.doc('results/' + p.assignmentId + '_' + await uidForStudent(sid)).get();
+      if (d.exists && d.data().teacherUid === t.uid) data = d.data();
+    }
+    if (!data) {
+      const all = await classResultDocs(t, classId, p.assignmentId);
+      data = all.find(x => str(x.studentId).trim().toLowerCase() === sid.toLowerCase()) || null;
+    }
+    if (!data) return ok([]);
+    return ok((data.runs || []).slice().sort((a, b) => ms(b.t) - ms(a.t)).slice(0, 20).map(runToRow));
   }
 
   const days = (p.days === 0 || p.days === '0') ? 0 : (parseInt(p.days, 10) || 14);
@@ -582,7 +595,8 @@ async function resultGetForTeacher(p) {
     return {
       studentId: d.studentId, name: d.name, class: d.classId, assignmentId: d.assignmentId, title: d.title, mode: d.mode,
       bestScore: best, lastScore: last ? Number(last.score) || 0 : 0, lastTimestamp: last ? last.t : '',
-      attempts: runs.length, perfectCount: runs.filter(r => r.perfect).length
+      attempts: runs.length, perfectCount: runs.filter(r => r.perfect).length,
+      lastMissed: last ? (last.missed || []) : []
     };
   }).sort((a, b) => str(b.lastTimestamp).localeCompare(str(a.lastTimestamp)));
 
