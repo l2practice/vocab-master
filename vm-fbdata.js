@@ -633,20 +633,26 @@ async function absentPenalty(p) {
     .filter(u => u.role === 'student' && !u.archived);
   const absent = roster.filter(u => !done[u._id]);
   const now = nowIso();
-  for (let i = 0; i < absent.length; i += 400) {
-    const batch = fs.batch();
-    absent.slice(i, i + 400).forEach(u => {
-      batch.set(fs.doc('results/' + p.assignmentId + '_' + u._id), {
-        uid: u._id, studentId: u.studentId, name: u.fullName || '', classId: u.classId, teacherUid: t.uid,
-        assignmentId: p.assignmentId, title: A.title || p.title || '', mode: 'inclass',
-        attempts: 1, perfectCount: 0, lastAt: now,
-        runs: [{ t: now, score: 0, perfect: false, dur: 0, correct: 0, total: p.total || A.vocabCount || 0, missed: allMissed, timedOut: false, absent: true }]
+  // One transaction per student: skip anyone whose result arrived since the read above (never overwrite a real submission)
+  let marked = 0;
+  for (let i = 0; i < absent.length; i += 20) {
+    const counts = await Promise.all(absent.slice(i, i + 20).map(u => {
+      const ref = fs.doc('results/' + p.assignmentId + '_' + u._id);
+      return fs.runTransaction(async tx => {
+        if ((await tx.get(ref)).exists) return 0;
+        tx.set(ref, {
+          uid: u._id, studentId: u.studentId, name: u.fullName || '', classId: u.classId, teacherUid: t.uid,
+          assignmentId: p.assignmentId, title: A.title || p.title || '', mode: 'inclass',
+          attempts: 1, perfectCount: 0, lastAt: now,
+          runs: [{ t: now, score: 0, perfect: false, dur: 0, correct: 0, total: p.total || A.vocabCount || 0, missed: allMissed, timedOut: false, absent: true }]
+        });
+        return 1;
       });
-    });
-    await batch.commit();
+    }));
+    marked += counts.reduce((a, b) => a + b, 0);
   }
   forget('res|');
-  return ok({ absentCount: absent.length, allMissedCount: allMissed.length });
+  return ok({ absentCount: marked, allMissedCount: allMissed.length });
 }
 
 async function recheckSave(p) {
