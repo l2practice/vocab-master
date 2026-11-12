@@ -66,7 +66,8 @@ service cloud.firestore {
                         && request.resource.data.teacherUid == profile().teacherUid)
                     || (isTeacher() && request.resource.data.teacherUid == request.auth.uid);
       allow update: if (isMe(resource.data.uid) && unchanged('uid') && unchanged('teacherUid')
-                        && request.resource.data.classId == profile().classId)
+                        && request.resource.data.classId == profile().classId
+                        && request.resource.data.get('runs', []).size() >= resource.data.get('runs', []).size())   // lần làm chỉ được thêm, không xoá
                     || (owns(resource.data) && unchanged('uid') && unchanged('teacherUid'));
       allow delete: if false;
     }
